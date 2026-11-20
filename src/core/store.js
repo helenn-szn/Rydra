@@ -1,4 +1,4 @@
-// Shape of everything MileZero keeps, plus retention. All of it lives on the driver's device.
+// Shape of everything Rydra keeps, plus retention. All of it lives on the driver's device.
 'use strict';
 
 const CONSENT_VERSION = 1;

@@ -1,4 +1,4 @@
-// Personal baselines. MileZero only ever compares a driver with their OWN usual readings.
+// Personal baselines. Rydra only ever compares a driver with their OWN usual readings.
 'use strict';
 
 const MIN_READINGS = 3;     // fewer than this = "building your baseline"

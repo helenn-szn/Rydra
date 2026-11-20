@@ -1,5 +1,5 @@
 {
-  "name": "milezero",
+  "name": "rydra",
   "version": "0.1.0",
   "private": true,
   "description": "A private check-in for long-distance drivers, built on the Presage SmartSpectra SDK.",
@@ -26,8 +26,8 @@
     "esbuild": "^0.25.0"
   },
   "build": {
-    "appId": "app.milezero.desktop",
-    "productName": "MileZero",
+    "appId": "app.rydra.desktop",
+    "productName": "Rydra",
     "files": [
       "main.js",
       "preload.js",
@@ -41,7 +41,7 @@
     "mac": {
       "hardenedRuntime": true,
       "extendInfo": {
-        "NSCameraUsageDescription": "MileZero uses the camera only during a check you start, to measure pulse and breathing."
+        "NSCameraUsageDescription": "Rydra uses the camera only during a check you start, to measure pulse and breathing."
       },
       "extraResources": [
         { "from": "node_modules/@smartspectra/node-sdk-darwin-${arch}/", "to": "smartspectra" }

@@ -1,4 +1,4 @@
-// MileZero renderer: screens, flow and local state.
+// Rydra renderer: screens, flow and local state.
 'use strict';
 
 const QRCode = require('qrcode');
@@ -14,9 +14,9 @@ const { DemoSensor } = require('../sensor/demo');
 
 const browserPreview = typeof window.mz === 'undefined';
 const api = browserPreview ? {
-  load: async () => { try { return JSON.parse(localStorage.getItem('milezero') || 'null'); } catch { return null; } },
-  save: async (d) => { try { localStorage.setItem('milezero', JSON.stringify(d)); } catch { /* preview only */ } return true; },
-  wipe: async () => { try { localStorage.removeItem('milezero'); } catch { /* preview only */ } return true; },
+  load: async () => { try { return JSON.parse(localStorage.getItem('rydra') || 'null'); } catch { return null; } },
+  save: async (d) => { try { localStorage.setItem('rydra', JSON.stringify(d)); } catch { /* preview only */ } return true; },
+  wipe: async () => { try { localStorage.removeItem('rydra'); } catch { /* preview only */ } return true; },
   config: async () => ({ apiKey: '', demoSensor: true, platform: 'browser' }),
 } : window.mz;
 
@@ -98,7 +98,7 @@ function readingChips(r) {
 
 function comparisonLine(cmp) {
   if (!cmp) return '';
-  if (cmp.status === 'building') return '<p class="quiet">Building your baseline: a few more good checks and MileZero can compare you with your usual.</p>';
+  if (cmp.status === 'building') return '<p class="quiet">Building your baseline: a few more good checks and Rydra can compare you with your usual.</p>';
   if (cmp.status === 'no-reading') return '';
   const part = (d, unit) => (d == null ? '' : `${d > 0 ? '+' : ''}${Math.round(d * 10) / 10} ${unit}`);
   const diffs = [part(cmp.pulseDiff, 'bpm'), part(cmp.breathDiff, 'breaths/min')].filter(Boolean).join(', ');
@@ -119,7 +119,7 @@ function shell(inner, { back } = {}) {
   return `
     <header class="top">
       ${back ? `<button class="link back" data-go="${back}">← Back</button>` : '<span></span>'}
-      <span class="brand">MileZero</span>
+      <span class="brand">Rydra</span>
       <button class="link" data-go="settings" aria-label="Settings">Settings</button>
     </header>
     ${demo ? '<div class="demo-banner">Demo sensor: readings are simulated and no camera is used.</div>' : ''}
@@ -152,9 +152,9 @@ VIEWS.consent = () => `
     <h1>Your check-in, your data.</h1>
     <ul class="facts">
       <li><b>Camera only when you start a check.</b> It turns off when the check ends.</li>
-      <li><b>No video is saved.</b> MileZero keeps only numbers: pulse, breathing, and HRV when available.</li>
+      <li><b>No video is saved.</b> Rydra keeps only numbers: pulse, breathing, and HRV when available.</li>
       <li><b>Everything stays on this device.</b> No employer dashboard, no automatic reporting.</li>
-      <li><b>Not a medical device.</b> MileZero never says you are safe to drive or that you are tired. It helps you plan rest.</li>
+      <li><b>Not a medical device.</b> Rydra never says you are safe to drive or that you are tired. It helps you plan rest.</li>
       <li><b>Delete everything anytime</b> from Settings.</li>
     </ul>
     <label class="check"><input type="checkbox" id="tele" ${state.settings.telemetry ? 'checked' : ''}>
@@ -194,7 +194,7 @@ VIEWS.home = () => {
         <h3>Your baseline</h3>
         ${base.ready
           ? `<p><b>${Math.round(base.pulse)}</b> bpm pulse · <b>${Math.round(base.breathing * 10) / 10}</b> breaths/min</p><p class="quiet">From your last ${base.count} good departure checks.</p>`
-          : `<p>Building: ${base.count} of ${base.needed} good checks.</p><p class="quiet">Until then MileZero relies mainly on your answers.</p>`}
+          : `<p>Building: ${base.count} of ${base.needed} good checks.</p><p class="quiet">Until then Rydra relies mainly on your answers.</p>`}
       </div>
       <div class="card">
         <h3>Last trip</h3>
@@ -503,7 +503,7 @@ VIEWS.trip = () => {
     <ol class="stops">
       ${j.plan.stops.map((s, i) => `<li class="${i < done ? 'done' : i === done ? 'next' : ''}"><b>${esc(s.name)}</b><span>${i < done ? 'checked' : s.town ? `about ${fmtDuration(s.atMin)}` : ''}</span></li>`).join('')}
     </ol>
-    <p class="callout">Never use MileZero while driving. Park first.</p>
+    <p class="callout">Never use Rydra while driving. Park first.</p>
     <div class="row">
       <button class="primary big" id="atStop">I'm parked at a rest stop</button>
       <button class="secondary" id="arrived">I've arrived</button>
@@ -666,7 +666,7 @@ VIEWS.settings = () => shell(`
       Share anonymous SDK usage reports with Presage. Presage says these never include video or vital signs.</label>
   </div>
   <div class="card">
-    <h3>What MileZero stores</h3>
+    <h3>What Rydra stores</h3>
     <p>${state.readings.length} readings (numbers only) and ${state.journeys.length} trips, all on this device. No video, no images.</p>
     <p class="quiet">Measuring with: ${esc(sensor ? sensor.label : '—')}</p>
     <button class="danger" id="wipe">Delete all my data</button>

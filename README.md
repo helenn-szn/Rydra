@@ -1,12 +1,12 @@
-# MileZero
+# Rydra
 
 **A private check-in for long-distance drivers, before, during and after the journey.**
 
-Drivers check their tyres, fuel and engine before a long trip. MileZero is a check for the person behind the wheel. It uses the [Presage SmartSpectra SDK](https://smartspectra.presagetech.com/docs/nodejs) to read live pulse and breathing from a laptop camera, compares them with the driver's *own* usual readings, and builds a rest plan with breaks at real towns on the route.
+Drivers check their tyres, fuel and engine before a long trip. Rydra is a check for the person behind the wheel. It uses the [Presage SmartSpectra SDK](https://smartspectra.presagetech.com/docs/nodejs) to read live pulse and breathing from a laptop camera, compares them with the driver's *own* usual readings, and builds a rest plan with breaks at real towns on the route.
 
 Built for the Presage SmartSpectra SDK Challenge on DEV.
 
-> MileZero is a wellness and planning aid. It is **not a medical device** and never says a driver is "safe to drive" or "fatigued."
+> Rydra is a wellness and planning aid. It is **not a medical device** and never says a driver is "safe to drive" or "fatigued."
 
 ## What it does
 
@@ -28,8 +28,8 @@ Preloaded routes: Lagos–Abuja (via Lokoja), Lagos–Port Harcourt, Abuja–Kan
 Requirements: Node.js 20+, a webcam, and macOS (Apple Silicon), Windows x64 or Linux x64/arm64 (glibc 2.35+).
 
 ```bash
-git clone <your repo url> milezero
-cd milezero
+git clone <your repo url> rydra
+cd rydra
 npm install
 cp .env.example .env          # then paste your key from https://physiology.presagetech.com/
 npm start
@@ -66,22 +66,22 @@ src/ui/app.js      screens and flow
 
 ## Consent and Data Handling
 
-- **Camera consent:** first launch shows a plain-language consent screen. The camera turns on only when the driver starts a check and is released when it ends. Electron is set to grant camera only (no microphone) and only to MileZero's own local page.
+- **Camera consent:** first launch shows a plain-language consent screen. The camera turns on only when the driver starts a check and is released when it ends. Electron is set to grant camera only (no microphone) and only to Rydra's own local page.
 - **What is stored:** numbers only: pulse, breathing rate, HRV when available, a quality flag, the driver's answers, rest plans and times. **No video or images are saved.**
-- **Where:** on the driver's device only. MileZero has no server.
+- **Where:** on the driver's device only. Rydra has no server.
 - **Sharing:** none by default. The optional passenger badge contains only "check-in completed," route name, time and number of planned stops.
 - **Retention:** 90 days by default (30 or 180 selectable). Older data is deleted on launch. An unfinished trip is kept.
 - **Deletion:** Settings → *Delete all my data* erases everything on the device.
-- **SDK telemetry:** the SmartSpectra SDK can send aggregate session summaries and readiness reports to Presage. Presage's SDK documentation states these contain **no raw frames or measured vitals**. MileZero turns this **off by default**; the driver can opt in on the consent screen or in Settings.
-- **Network:** the SDK validates the API key with Presage's servers. If a camera check can't start (no connection, authentication or credit errors), MileZero falls back to a clearly labelled questions-only check. The saved plan, history and nap timer work without a connection.
+- **SDK telemetry:** the SmartSpectra SDK can send aggregate session summaries and readiness reports to Presage. Presage's SDK documentation states these contain **no raw frames or measured vitals**. Rydra turns this **off by default**; the driver can opt in on the consent screen or in Settings.
+- **Network:** the SDK validates the API key with Presage's servers. If a camera check can't start (no connection, authentication or credit errors), Rydra falls back to a clearly labelled questions-only check. The saved plan, history and nap timer work without a connection.
 - **AI services:** none used.
 
 ## Limits
 
 - Camera readings need the driver to be parked, sitting still, facing the camera in reasonable light.
-- Pulse and breathing change for many reasons (heat, caffeine, stress, rushing). MileZero says so beside every comparison and never treats them as a measure of tiredness.
+- Pulse and breathing change for many reasons (heat, caffeine, stress, rushing). Rydra says so beside every comparison and never treats them as a measure of tiredness.
 - Route times are approximate planning estimates, not navigation.
 
 ## Licence
 
-MileZero code: MIT. The SmartSpectra SDK is licensed separately by Presage Technologies.
+Rydra code: MIT. The SmartSpectra SDK is licensed separately by Presage Technologies.

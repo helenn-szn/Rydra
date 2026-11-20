@@ -1,4 +1,4 @@
-// MileZero preload: loads the SmartSpectra bridge and exposes a small, fixed API for local storage.
+// Rydra preload: loads the SmartSpectra bridge and exposes a small, fixed API for local storage.
 'use strict';
 
 const { contextBridge, ipcRenderer } = require('electron');

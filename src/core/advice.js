@@ -1,4 +1,4 @@
-// What MileZero says to the driver. Rules:
+// What Rydra says to the driver. Rules:
 // 1. Never say "safe to drive" or "you are fatigued". We describe readings and suggest plans.
 // 2. What the driver reports about sleepiness always wins over the camera.
 // 3. Every comparison carries a plain note that readings change for many reasons.

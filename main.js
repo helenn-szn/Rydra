@@ -1,4 +1,4 @@
-// MileZero main process.
+// Rydra main process.
 // - Opens the app window with the SmartSpectra preload bridge.
 // - Stores all journey data in ONE local JSON file in the user's app-data folder.
 // - Hands the API key to the renderer (read from the environment or a local .env file).
@@ -25,7 +25,7 @@ if (!DEMO_SENSOR) {
 
 const { seedDemoData } = require('./src/core/seed');
 
-const storeFile = () => path.join(app.getPath('userData'), 'milezero-data.json');
+const storeFile = () => path.join(app.getPath('userData'), 'rydra-data.json');
 
 function readStore() {
   try {
@@ -61,7 +61,7 @@ function createWindow() {
     height: 760,
     minWidth: 420,
     backgroundColor: '#f6f4ef',
-    title: 'MileZero',
+    title: 'Rydra',
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -73,7 +73,7 @@ function createWindow() {
 
   if (bindSmartSpectraIpc) bindSmartSpectraIpc(win);
 
-  // MileZero only ever shows its own local page.
+  // Rydra only ever shows its own local page.
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   win.webContents.on('will-navigate', (event) => event.preventDefault());
   win.loadFile(path.join(__dirname, 'index.html'));
@@ -90,7 +90,7 @@ app.whenReady().then(() => {
 
   if (process.env.MZ_SEED_DEMO === '1') {
     writeStore(seedDemoData(readStore()));
-    console.log('[milezero] Seeded demo history into', storeFile());
+    console.log('[rydra] Seeded demo history into', storeFile());
   }
 
   createWindow();
