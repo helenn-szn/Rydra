@@ -1,0 +1,64 @@
+{
+  "name": "milezero",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A private check-in for long-distance drivers, built on the Presage SmartSpectra SDK.",
+  "main": "main.js",
+  "license": "MIT",
+  "scripts": {
+    "build": "esbuild src/ui/app.js --bundle --outfile=dist/renderer.bundle.js --platform=browser --format=iife --log-level=warning",
+    "start": "npm run build && electron .",
+    "demo": "npm run build && cross-env MZ_DEMO_SENSOR=1 electron .",
+    "seed": "npm run build && cross-env MZ_SEED_DEMO=1 electron .",
+    "test": "node --test test/*.test.js",
+    "dist:mac": "npm run build && electron-builder --mac --arm64",
+    "dist:win": "npm run build && electron-builder --win --x64",
+    "dist:linux": "npm run build && electron-builder --linux --x64"
+  },
+  "dependencies": {
+    "@smartspectra/node-sdk": "^3.5.0",
+    "qrcode": "^1.5.4"
+  },
+  "devDependencies": {
+    "cross-env": "^7.0.3",
+    "electron": "43.8.1",
+    "electron-builder": "^26.6.0",
+    "esbuild": "^0.25.0"
+  },
+  "build": {
+    "appId": "app.milezero.desktop",
+    "productName": "MileZero",
+    "files": [
+      "main.js",
+      "preload.js",
+      "index.html",
+      "styles.css",
+      "dist/**",
+      "src/core/**",
+      "node_modules/**",
+      "!node_modules/@smartspectra/node-sdk-*/**"
+    ],
+    "mac": {
+      "hardenedRuntime": true,
+      "extendInfo": {
+        "NSCameraUsageDescription": "MileZero uses the camera only during a check you start, to measure pulse and breathing."
+      },
+      "extraResources": [
+        { "from": "node_modules/@smartspectra/node-sdk-darwin-${arch}/", "to": "smartspectra" }
+      ]
+    },
+    "win": {
+      "target": "nsis",
+      "extraResources": [
+        { "from": "node_modules/@smartspectra/node-sdk-win32-${arch}/", "to": "smartspectra" }
+      ]
+    },
+    "linux": {
+      "target": "AppImage",
+      "extraResources": [
+        { "from": "node_modules/@smartspectra/node-sdk-linux-${arch}/", "to": "smartspectra" }
+      ]
+    },
+    "asar": true
+  }
+}
