@@ -473,6 +473,7 @@ VIEWS.check = () => {
     <ul class="quality" aria-label="Signal">
       ${['light', 'position', 'stillness'].map((g) => `<li id="q-${g}" class="pending"><i></i>${t(`check.${g}`)}</li>`).join('')}
     </ul>
+    <p class="cam-info" id="camInfo" aria-live="off"></p>
     <div class="live">
       <div><b id="livePulse">—</b><small>${t('check.pulse')}</small></div>
       <div><b id="liveBreath">—</b><small>${t('check.breathing')}</small></div>
@@ -505,7 +506,7 @@ AFTER.check = () => {
   const onHint = (code) => {
     const el = $('hint'); if (!el) return;
     el.textContent = t(`hint.${code || 'ok'}`);
-    if (code === 'tuning' || code === 'lowFps' || code === 'connecting') return;
+    if (code === 'tuning' || code === 'lowFps' || code === 'connecting' || code === 'lightMode') return;
     // The SDK reports one issue at a time. A group turns red when it is the issue, and green once
     // the SDK reports "ok" or has moved on to a different issue.
     for (const [g, codes] of Object.entries(QUALITY_GROUPS)) {
@@ -520,6 +521,11 @@ AFTER.check = () => {
 
   sensor.measure({
     seconds: view.seconds, video: $('video'), abort, onRunning: startCountdown, onHint,
+    onCamera: (c) => {
+      const el = $('camInfo'); if (!el) return;
+      el.textContent = t('check.camInfo', { w: c.width || '?', h: c.height || '?', fps: c.fps });
+      el.className = `cam-info ${c.fps && c.fps < 20 ? 'slow' : ''}`;
+    },
     onLive: (r) => {
       const p = $('livePulse'); if (!p) return;
       p.textContent = r.pulse ?? '—';

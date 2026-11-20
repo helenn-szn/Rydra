@@ -30,18 +30,22 @@ const HINTS = {
 // Rydra opens the camera itself at a modest resolution. The SDK's default (1280x720) has to be copied
 // from the window to the SDK frame by frame, and on many laptops that pushes the frame rate below what
 // the SDK needs ("frame rate stayed too low", code 14). 640x480 at 30 fps is plenty for a face.
-const CAMERA_CONSTRAINTS = {
-  audio: false,
-  video: { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 30, min: 15 }, facingMode: 'user' },
+const CAMERA = {
+  standard: { width: 640, height: 480 },
+  light: { width: 424, height: 320 },       // for slower laptops: a quarter fewer pixels again
 };
 
-async function openCamera() {
+async function openCamera(mode) {
+  const size = CAMERA[mode] || CAMERA.standard;
   try {
-    return await navigator.mediaDevices.getUserMedia(CAMERA_CONSTRAINTS);
+    return await navigator.mediaDevices.getUserMedia({
+      audio: false,
+      video: { width: { ideal: size.width }, height: { ideal: size.height }, frameRate: { ideal: 30, min: 15 } },
+    });
   } catch (err) {
     // Some webcams reject the frame-rate floor; retry with just the size.
     if (err && err.name === 'OverconstrainedError') {
-      return navigator.mediaDevices.getUserMedia({ audio: false, video: { width: { ideal: 640 }, height: { ideal: 480 } } });
+      return navigator.mediaDevices.getUserMedia({ audio: false, video: { width: { ideal: size.width }, height: { ideal: size.height } } });
     }
     const e = new Error(err && err.name === 'NotAllowedError'
       ? 'Camera access was blocked. Check Windows Settings > Privacy & security > Camera.'
@@ -53,9 +57,34 @@ async function openCamera() {
   }
 }
 
+/** Reports the camera's real delivered frame rate once a second, so problems are visible on screen. */
+function watchFrameRate(stream, { onCamera, abort }) {
+  const track = stream.getVideoTracks()[0];
+  if (!track) return;
+  const settings = track.getSettings ? track.getSettings() : {};
+  const probe = document.createElement('video');
+  probe.muted = true; probe.playsInline = true; probe.srcObject = stream;
+  probe.play().catch(() => {});
+  let frames = 0;
+  let last = performance.now();
+  const tick = () => {
+    if (track.readyState === 'ended' || (abort && abort.aborted)) { probe.srcObject = null; return; }
+    frames += 1;
+    const now = performance.now();
+    if (now - last >= 1000) {
+      onCamera({ width: settings.width, height: settings.height, fps: Math.round((frames * 1000) / (now - last)), label: track.label });
+      frames = 0; last = now;
+    }
+    probe.requestVideoFrameCallback(tick);
+  };
+  if (probe.requestVideoFrameCallback) probe.requestVideoFrameCallback(tick);
+  else onCamera({ width: settings.width, height: settings.height, fps: Math.round(settings.frameRate || 0), label: track.label });
+}
+
 // What Rydra asks the SDK for. Arterial pressure (part of the SDK's "cardio" bundle) is left out:
 // Rydra never uses it, and it needs extra model setup that can fail with "configuration failed".
 const FULL_METRICS = [...breathingMetrics, MetricType.PULSE_RATE, MetricType.HRV];
+const LIGHT_METRICS = [...breathingMetrics, MetricType.PULSE_RATE];   // no HRV: less processing per frame
 const BREATHING_ONLY = [...breathingMetrics];
 
 // Errors that mean the requested measurements can't run here; Rydra retries once with breathing only.
@@ -73,12 +102,25 @@ class SmartSpectraSensor {
     this.telemetry = !!telemetry;
     this.label = 'SmartSpectra camera';
     this.breathingOnly = false;   // set after a fallback, so later checks skip the failing setup
+    this.mode = 'standard';       // switches to 'light' after a low-frame-rate stop, for the rest of the session
+  }
+
+  metrics() {
+    if (this.breathingOnly) return BREATHING_ONLY;
+    return this.mode === 'light' ? LIGHT_METRICS : FULL_METRICS;
   }
 
   async measure(opts) {
     try {
-      return await this.measureWith(this.breathingOnly ? BREATHING_ONLY : FULL_METRICS, opts);
+      return await this.measureWith(this.metrics(), opts);
     } catch (err) {
+      if (err.code === SmartSpectraErrorCode.kSustainedLowFrameRate && this.mode === 'standard' && !(opts.abort && opts.abort.aborted)) {
+        console.warn('[rydra] Low frame rate; retrying in light camera mode.');
+        this.mode = 'light';
+        this.label = 'SmartSpectra camera (light mode)';
+        if (opts.onHint) opts.onHint('lightMode');
+        return this.measure(opts);
+      }
       if (!this.breathingOnly && RETRY_BREATHING_ONLY.has(err.code) && !(opts.abort && opts.abort.aborted)) {
         console.warn('[rydra] SmartSpectra rejected pulse + HRV; retrying with breathing only.', err.code, err.message);
         this.breathingOnly = true;
@@ -97,7 +139,8 @@ class SmartSpectraSensor {
    * @returns {Promise<{pulse,breathing,hrv,quality,samples,source:'camera'}>}
    */
   async measureWith(requestedMetrics, opts) {
-    const stream = await openCamera();
+    const stream = await openCamera(this.mode);
+    if (opts.onCamera) watchFrameRate(stream, opts);
     try {
       return await this.run(requestedMetrics, stream, opts);
     } finally {
