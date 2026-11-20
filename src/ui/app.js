@@ -209,6 +209,7 @@ const AFTER = {};
 
 function render() {
   applyTheme();
+  document.body.classList.toggle('camera-live', CAMERA_VIEWS.has(view.name));
   const fn = VIEWS[view.name] || VIEWS.home;
   document.getElementById('app').innerHTML = fn();
   bindNav();
@@ -538,7 +539,8 @@ AFTER.check = () => {
       afterCheck({ source: 'questions', quality: 'none' }, 'check.unavailable');
     } else {
       const box = $('checkError');
-      if (box) box.innerHTML = `<p class="callout care">${t('check.stopped', { msg: esc(err.message) })}</p><button class="btn primary" id="retry">${t('check.retry')}</button>`;
+      const tip = err.code === 14 ? `<p class="quiet">${t('check.slowTip')}</p>` : '';
+      if (box) box.innerHTML = `<p class="callout care">${t('check.stopped', { msg: esc(err.message) })}</p>${tip}<button class="btn primary" id="retry">${t('check.retry')}</button>`;
       on('#retry', 'click', () => go('check', { kind: view.kind, seconds: view.seconds, recheck: view.recheck }));
     }
   });

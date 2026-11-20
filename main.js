@@ -17,6 +17,10 @@ if (app.isPackaged) {
 
 loadDotEnv(path.join(__dirname, '.env'));
 
+// Don't let Chromium slow the renderer down while a camera check is running.
+app.commandLine.appendSwitch('disable-renderer-backgrounding');
+app.commandLine.appendSwitch('disable-background-timer-throttling');
+
 const DEMO_SENSOR = process.env.MZ_DEMO_SENSOR === '1';
 let bindSmartSpectraIpc = null;
 if (!DEMO_SENSOR) {
@@ -68,6 +72,8 @@ function createWindow() {
       // Our preload loads the SDK's preload bridge from node_modules, which needs require().
       sandbox: false,
       nodeIntegration: false,
+      // Keep the frame pump running at full speed even if the window loses focus.
+      backgroundThrottling: false,
     },
   });
 

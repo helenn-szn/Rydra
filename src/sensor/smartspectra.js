@@ -27,6 +27,32 @@ const HINTS = {
   [ValidationCode.kExcessiveMotion]: 'motion',
 };
 
+// Rydra opens the camera itself at a modest resolution. The SDK's default (1280x720) has to be copied
+// from the window to the SDK frame by frame, and on many laptops that pushes the frame rate below what
+// the SDK needs ("frame rate stayed too low", code 14). 640x480 at 30 fps is plenty for a face.
+const CAMERA_CONSTRAINTS = {
+  audio: false,
+  video: { width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 30, min: 15 }, facingMode: 'user' },
+};
+
+async function openCamera() {
+  try {
+    return await navigator.mediaDevices.getUserMedia(CAMERA_CONSTRAINTS);
+  } catch (err) {
+    // Some webcams reject the frame-rate floor; retry with just the size.
+    if (err && err.name === 'OverconstrainedError') {
+      return navigator.mediaDevices.getUserMedia({ audio: false, video: { width: { ideal: 640 }, height: { ideal: 480 } } });
+    }
+    const e = new Error(err && err.name === 'NotAllowedError'
+      ? 'Camera access was blocked. Check Windows Settings > Privacy & security > Camera.'
+      : err && err.name === 'NotReadableError'
+        ? 'The camera is busy in another app. Close other apps using it and try again.'
+        : `Could not open the camera (${(err && err.name) || 'unknown error'}).`);
+    e.camera = true;
+    throw e;
+  }
+}
+
 // What Rydra asks the SDK for. Arterial pressure (part of the SDK's "cardio" bundle) is left out:
 // Rydra never uses it, and it needs extra model setup that can fail with "configuration failed".
 const FULL_METRICS = [...breathingMetrics, MetricType.PULSE_RATE, MetricType.HRV];
@@ -70,7 +96,16 @@ class SmartSpectraSensor {
    * @param {{seconds:number, video?:HTMLVideoElement, onLive?:Function, onHint?:Function, onRunning?:Function, abort?:{aborted:boolean}}} opts
    * @returns {Promise<{pulse,breathing,hrv,quality,samples,source:'camera'}>}
    */
-  measureWith(requestedMetrics, { seconds, video, onLive, onHint, onRunning, abort }) {
+  async measureWith(requestedMetrics, opts) {
+    const stream = await openCamera();
+    try {
+      return await this.run(requestedMetrics, stream, opts);
+    } finally {
+      for (const track of stream.getTracks()) { try { track.stop(); } catch { /* already stopped */ } }
+    }
+  }
+
+  run(requestedMetrics, stream, { seconds, video, onLive, onHint, onRunning, abort }) {
     const acc = { pulse: [], breathing: [], hrv: [] };
     const sdk = new SmartSpectraSDK({
       apiKey: this.apiKey,
@@ -93,7 +128,9 @@ class SmartSpectraSensor {
         if (err) reject(err); else resolve(Object.assign(summarize(acc, { breathingOnly: requestedMetrics === BREATHING_ONLY }), { source: 'camera' }));
       };
 
-      sdk.on('streamAvailable', (stream) => { if (video) video.srcObject = stream; });
+      sdk.useMediaStream(stream);
+      if (video) video.srcObject = stream;
+      sdk.on('streamAvailable', (s) => { if (video && video.srcObject !== s) video.srcObject = s; });
       sdk.on('validationStatus', (code) => onHint && onHint(HINTS[code] || 'ok'));
       sdk.on('metrics', (buf) => {
         collect(decodeMetrics(buf), acc);
