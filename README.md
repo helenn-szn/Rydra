@@ -50,6 +50,19 @@ Allow camera access, accept the consent screen, choose your kind of driving, the
 
 **Windows shortcut:** after the first setup, double-click **Start Rydra.bat** in the project folder to open the app. You can right-click it and choose *Send to > Desktop (create shortcut)*.
 
+### Sharing Rydra with testers
+
+**Windows installer (easiest for testers):**
+
+1. On your Windows laptop, in the project folder, run `npm.cmd run dist:win`.
+2. Send the tester the installer from the `release` folder (`Rydra Setup 0.2.0.exe`) via Google Drive, WeTransfer or similar.
+3. The tester runs it. The installer isn't code-signed, so Windows SmartScreen will warn: click **More info**, then **Run anyway**.
+4. In Rydra, the tester opens **Settings > Presage API key** and pastes their own free key from physiology.presagetech.com. Without a key, Rydra runs with the clearly labelled demo sensor.
+
+**Source code (for developers):** share the repository. Testers need Node.js 20+, then `npm install`, a `.env` with their key, and `npm start`.
+
+Each tester should use **their own** API key. Keys are personal and usage counts against the key owner's account.
+
 ### New drivers and the baseline
 
 Rydra compares each driver only with their own usual readings, so it needs 3 good checks before it can say "higher than usual." Until then:

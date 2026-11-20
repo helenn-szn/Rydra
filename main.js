@@ -30,6 +30,12 @@ if (!DEMO_SENSOR) {
 const { seedDemoData } = require('./src/core/seed');
 
 const storeFile = () => path.join(app.getPath('userData'), 'rydra-data.json');
+// The API key is kept apart from journey data: deleting your data doesn't remove it, and it is never exported.
+const keyFile = () => path.join(app.getPath('userData'), 'rydra-key.json');
+
+function savedKey() {
+  try { return JSON.parse(fs.readFileSync(keyFile(), 'utf8')).apiKey || ''; } catch { return ''; }
+}
 
 function readStore() {
   try {
@@ -53,8 +59,17 @@ ipcMain.handle('mz:wipe', () => {
   try { fs.rmSync(storeFile(), { force: true }); } catch { /* already gone */ }
   return true;
 });
+ipcMain.handle('mz:setKey', (_e, key) => {
+  const clean = String(key || '').trim();
+  if (!clean) { try { fs.rmSync(keyFile(), { force: true }); } catch { /* already gone */ } return true; }
+  if (!/^[A-Za-z0-9_\-.]{8,200}$/.test(clean)) throw new Error('That does not look like an API key.');
+  fs.mkdirSync(path.dirname(keyFile()), { recursive: true });
+  fs.writeFileSync(keyFile(), JSON.stringify({ apiKey: clean }), { mode: 0o600 });
+  return true;
+});
 ipcMain.handle('mz:config', () => ({
-  apiKey: process.env.SMARTSPECTRA_API_KEY || '',
+  apiKey: process.env.SMARTSPECTRA_API_KEY || savedKey(),
+  keySource: process.env.SMARTSPECTRA_API_KEY ? 'env' : savedKey() ? 'settings' : 'none',
   demoSensor: DEMO_SENSOR,
   platform: process.platform,
 }));

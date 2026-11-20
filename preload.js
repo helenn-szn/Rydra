@@ -12,4 +12,5 @@ contextBridge.exposeInMainWorld('mz', {
   save: (data) => ipcRenderer.invoke('mz:save', data),
   wipe: () => ipcRenderer.invoke('mz:wipe'),
   config: () => ipcRenderer.invoke('mz:config'),
+  setKey: (key) => ipcRenderer.invoke('mz:setKey', key),
 });

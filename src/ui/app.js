@@ -23,7 +23,8 @@ const api = browserPreview ? {
   load: async () => { try { return JSON.parse(localStorage.getItem('rydra') || 'null'); } catch { return null; } },
   save: async (d) => { try { localStorage.setItem('rydra', JSON.stringify(d)); } catch { /* preview only */ } return true; },
   wipe: async () => { try { localStorage.removeItem('rydra'); } catch { /* preview only */ } return true; },
-  config: async () => ({ apiKey: '', demoSensor: true, platform: 'browser' }),
+  config: async () => ({ apiKey: '', demoSensor: true, platform: 'browser', keySource: 'none' }),
+  setKey: async () => true,
 } : window.mz;
 
 let config = { apiKey: '', demoSensor: true };
@@ -977,6 +978,13 @@ VIEWS.settings = () => {
       <label class="check"><input type="checkbox" id="mapOn" ${s.map ? 'checked' : ''}> <span><b>${t('settings.map')}</b><br><small>${t('settings.mapNote')}</small></span></label>
       <label class="check"><input type="checkbox" id="tele" ${s.telemetry ? 'checked' : ''}> <span>${t('consent.tele')}</span></label>
     </section>
+    ${browserPreview ? '' : `<section class="panel">
+      <h3>${t('settings.key')}</h3>
+      <p class="quiet">${config.keySource === 'env' ? t('settings.keyEnv') : config.apiKey ? t('settings.keySet', { end: esc(config.apiKey.slice(-4)) }) : t('settings.keyNone')}</p>
+      ${config.keySource === 'env' ? '' : `<form id="keyForm" class="search-row"><input id="keyIn" type="password" autocomplete="off" placeholder="${t('settings.keyPh')}"><button class="btn primary" type="submit">${t('settings.keySave')}</button></form>
+      ${config.apiKey ? `<button class="btn text" id="keyRemove">${t('settings.keyRemove')}</button>` : ''}
+      <p class="quiet" id="keyMsg"></p>`}
+    </section>`}
     <section class="panel"><h3>${t('settings.keep')}</h3>${seg('setKeep', [30, 90, 180].map((d) => [d, t('settings.days', { n: d })]), s.retentionDays)}</section>
     <section class="panel">
       <h3>${t('settings.stores')}</h3>
@@ -997,6 +1005,19 @@ AFTER.settings = () => {
   pick('setKeep', (v) => { state.settings.retentionDays = parseInt(v, 10); state = prune(state); });
   on('#mapOn', 'change', async (e) => { state.settings.map = e.currentTarget.checked; await save(); });
   on('#tele', 'change', async (e) => { state.settings.telemetry = e.currentTarget.checked; sensor = makeSensor(); await save(); });
+  const applyKey = async (key) => {
+    try {
+      await api.setKey(key);
+      config = await api.config();
+      sensor = makeSensor();
+      render();
+    } catch (err) {
+      const m = $('keyMsg'); if (m) m.textContent = err.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '');
+    }
+  };
+  const form = $('keyForm');
+  if (form) form.addEventListener('submit', (e) => { e.preventDefault(); applyKey($('keyIn').value); });
+  on('#keyRemove', 'click', () => applyKey(''));
   on('#wipe', 'click', () => { $('confirm').hidden = false; });
   on('#wipeNo', 'click', () => { $('confirm').hidden = true; });
   on('#wipeYes', 'click', async () => { await api.wipe(); state = emptyState(); setLang(detectLang(navigator.language)); go('intro', { i: 1 }); });
