@@ -10,6 +10,7 @@ const { badgeText } = require('../core/badge');
 const { PROFILES, getProfile } = require('../core/profiles');
 const { CONSENT_VERSION, emptyState, normalize, prune, newId } = require('../core/store');
 const { DemoSensor } = require('../sensor/demo');
+const { seedDemoData } = require('../core/seed');
 const { t, setLang, getLang, detectLang, LANGS } = require('./i18n');
 const { ICONS, LOGO, dots, statusTag } = require('./icons');
 const { roadScene } = require('./scene');
@@ -19,6 +20,8 @@ const { drawRoute, destroyMap } = require('./map');
 // ---------------------------------------------------------------- platform
 
 const browserPreview = typeof window.mz === 'undefined';
+// The hosted web demo (e.g. on Vercel): simulated readings only; the real camera check is in the desktop app.
+const webDemo = browserPreview && /^https?:$/.test(location.protocol);
 const api = browserPreview ? {
   load: async () => { try { return JSON.parse(localStorage.getItem('rydra') || 'null'); } catch { return null; } },
   save: async (d) => { try { localStorage.setItem('rydra', JSON.stringify(d)); } catch { /* preview only */ } return true; },
@@ -124,7 +127,9 @@ function shell(inner, { back, actions, wide } = {}) {
       </div>
       ${CAMERA_VIEWS.has(view.name) ? `<span class="cam-on" role="status"><i></i>${t('camera.on')}</span>` : `<button class="pill-btn" data-go="settings">${t('nav.settings')}</button>`}
     </header>
-    ${demo ? `<p class="demo-note"><span>${t('demo.banner')}</span></p>` : ''}
+    ${demo ? (webDemo
+      ? `<p class="demo-note"><span>${t('web.banner')} <a href="https://github.com/helenn-szn/Rydra" target="_blank" rel="noopener">${t('web.getApp')}</a></span></p>`
+      : `<p class="demo-note"><span>${t('demo.banner')}</span></p>`) : ''}
     <main id="main" class="${wide ? 'wide' : ''}">${inner}</main>
     ${actions ? `<div class="actions"><div class="actions-in">${actions}</div></div>` : ''}`;
 }
@@ -1105,6 +1110,8 @@ AFTER.settings = () => {
 (async function boot() {
   try { config = await api.config(); } catch { /* keep defaults */ }
   state = prune(normalize(await api.load()));
+  // Web demo visitors get labelled practice readings, so the baseline comparison is visible straight away.
+  if (webDemo && !state.readings.length) { const seeded = seedDemoData(state); seeded.consent = state.consent; seeded.introSeen = state.introSeen; state = seeded; }
   setLang(state.settings.lang || detectLang(navigator.language));
   await save();
   sensor = makeSensor();
