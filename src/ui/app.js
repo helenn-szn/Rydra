@@ -205,6 +205,27 @@ function optionGrid(name, values, labelKey, selected) {
   return `<div class="tiles" data-q="${name}" role="radiogroup">${values.map((v) => `<button class="tile ${selected === v ? 'on' : ''}" role="radio" aria-checked="${selected === v}" data-v="${v}">${t(`${labelKey}.${v}`)}</button>`).join('')}</div>`;
 }
 
+// ---------------------------------------------------------------- cameras
+
+/** Video cameras with readable names. Windows hides names until camera permission is granted,
+ *  so if names are blank (and no check is running) we open the camera for a moment to unlock them. */
+async function listCameras({ probe = false } = {}) {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return [];
+  let cams = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'videoinput');
+  if (probe && cams.some((c) => !c.label)) {
+    try {
+      const s = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      s.getTracks().forEach((tr) => tr.stop());
+      cams = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'videoinput');
+    } catch { /* permission refused: keep generic names */ }
+  }
+  return cams.map((c, i) => ({ id: c.deviceId, name: c.label || `${t('check.camera')} ${i + 1}` }));
+}
+
+function cameraOptions(cams) {
+  return `<option value="">${t('settings.cameraAuto')}</option>` + cams.map((c) => `<option value="${esc(c.id)}" ${c.id === state.settings.cameraId ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
+}
+
 // ---------------------------------------------------------------- render
 
 const VIEWS = {};
@@ -522,27 +543,29 @@ AFTER.check = () => {
 
   on('#skip', 'click', () => { abort.aborted = true; afterCheck({ source: 'questions', quality: 'none' }, null); });
 
-  // Camera picker: shown when more than one camera is connected (e.g. a phone used as a webcam).
-  if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices && !(sensor instanceof DemoSensor)) {
-    navigator.mediaDevices.enumerateDevices().then((devices) => {
-      const cams = devices.filter((d) => d.kind === 'videoinput');
-      const sel = $('camPick'); const wrap = $('camPickWrap');
-      if (!sel || cams.length < 2) return;
-      sel.innerHTML = cams.map((c, i) => `<option value="${esc(c.deviceId)}" ${c.deviceId === state.settings.cameraId ? 'selected' : ''}>${esc(c.label || `Camera ${i + 1}`)}</option>`).join('');
-      wrap.hidden = false;
-      sel.addEventListener('change', async () => {
-        state.settings.cameraId = sel.value;
-        await save();
-        sensor.cameraId = sel.value;
-        sensor.mode = 'standard';
-        go('check', { kind: view.kind, seconds: view.seconds, recheck: view.recheck });
-      });
-    }).catch(() => {});
-  }
+  // Camera picker: filled once the camera is running, when Windows makes camera names available.
+  let pickerFilled = false;
+  const fillPicker = async () => {
+    if (pickerFilled || sensor instanceof DemoSensor) return;
+    pickerFilled = true;
+    const cams = await listCameras();
+    const sel = $('camPick'); const wrap = $('camPickWrap');
+    if (!sel || cams.length < 2) return;
+    sel.innerHTML = cameraOptions(cams);
+    wrap.hidden = false;
+    sel.addEventListener('change', async () => {
+      state.settings.cameraId = sel.value || null;
+      await save();
+      sensor.cameraId = state.settings.cameraId;
+      sensor.mode = 'standard';
+      go('check', { kind: view.kind, seconds: view.seconds, recheck: view.recheck });
+    });
+  };
 
   sensor.measure({
     seconds: view.seconds, video: $('video'), abort, onRunning: startCountdown, onHint,
     onCamera: (c) => {
+      fillPicker();
       const el = $('camInfo'); if (!el) return;
       el.textContent = t('check.camInfo', { w: c.width || '?', h: c.height || '?', fps: c.fps });
       el.className = `cam-info ${c.fps && c.fps < 20 ? 'slow' : ''}`;
@@ -566,6 +589,7 @@ AFTER.check = () => {
       afterCheck({ source: 'questions', quality: 'none' }, 'check.unavailable');
     } else {
       const box = $('checkError');
+      fillPicker();
       const tip = err.code === 14 ? `<p class="quiet">${t('check.slowTip')}</p>` : '';
       if (box) box.innerHTML = `<p class="callout care">${t('check.stopped', { msg: esc(err.message) })}</p>${tip}<button class="btn primary" id="retry">${t('check.retry')}</button>`;
       on('#retry', 'click', () => go('check', { kind: view.kind, seconds: view.seconds, recheck: view.recheck }));
@@ -1011,6 +1035,9 @@ VIEWS.settings = () => {
     <section class="panel"><h3>${t('settings.lang')}</h3>${seg('setLang', LANGS.map((l) => [l.id, l.name]), getLang())}</section>
     <section class="panel"><h3>${t('settings.theme')}</h3>${seg('setTheme', [['auto', t('theme.auto')], ['day', t('theme.day')], ['night', t('theme.night')]], s.theme || 'auto')}</section>
     <section class="panel"><h3>${t('settings.profile')}</h3>${seg('setProfile', Object.values(PROFILES).map((p) => [p.id, t(`profile.${p.id}`)]), profile().id)}</section>
+    ${sensor instanceof DemoSensor ? '' : `<section class="panel"><h3>${t('check.camera')}</h3>
+      <select id="setCamera" class="select"><option>${t('loading')}</option></select>
+      <p class="quiet">${t('settings.cameraNote')}</p></section>`}
     <section class="panel"><h3>${t('settings.units')}</h3>${seg('setUnits', [['km', t('units.km')], ['mi', t('units.mi')]], units())}</section>
     <section class="panel">
       <label class="check"><input type="checkbox" id="mapOn" ${s.map ? 'checked' : ''}> <span><b>${t('settings.map')}</b><br><small>${t('settings.mapNote')}</small></span></label>
@@ -1036,6 +1063,18 @@ VIEWS.settings = () => {
 
 AFTER.settings = () => {
   const pick = (id, fn) => on(`#${id} button`, 'click', async (e) => { await fn(e.currentTarget.dataset.v); await save(); render(); });
+  const camSel = $('setCamera');
+  if (camSel) {
+    listCameras({ probe: true }).then((cams) => {
+      if (!$('setCamera')) return;
+      camSel.innerHTML = cameraOptions(cams);
+    });
+    camSel.addEventListener('change', async () => {
+      state.settings.cameraId = camSel.value || null;
+      if (sensor) { sensor.cameraId = state.settings.cameraId; sensor.mode = 'standard'; }
+      await save();
+    });
+  }
   pick('setLang', (v) => { state.settings.lang = v; setLang(v); });
   pick('setTheme', (v) => { state.settings.theme = v; });
   pick('setProfile', (v) => { state.settings.profile = v; });

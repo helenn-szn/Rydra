@@ -271,7 +271,9 @@ main.center { text-align: center; padding-top: 140px; }
 .cam-row { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 14px; margin: -4px 0 10px; }
 .cam-row .cam-info { margin: 0; }
 .cam-pick { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: var(--quiet); }
-.cam-pick select { font: inherit; font-size: 13px; color: var(--ink); background: var(--card); border: 1px solid var(--hair); border-radius: 999px; padding: 6px 10px; max-width: 260px; }
+.cam-pick select, select.select { font: inherit; font-size: 13.5px; color: #111418; background: #ffffff; color-scheme: light; border: 1px solid var(--hair); border-radius: 999px; padding: 8px 12px; min-width: 200px; max-width: 100%; }
+select.select { width: 100%; max-width: 420px; }
+.cam-pick select option, select.select option { color: #111418; background: #ffffff; }
 .cam-info { font-size: 12.5px; color: var(--quiet); margin: -4px 0 10px; font-variant-numeric: tabular-nums; min-height: 1em; }
 .cam-info.slow { color: var(--bad); font-weight: 500; }
 .live { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
