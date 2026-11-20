@@ -312,6 +312,14 @@ video.mini { width: 140px; border-radius: var(--r-sm); margin-top: 16px; transfo
 .result { border-radius: var(--r); padding: 18px 20px; margin: 16px 0; background: var(--card); box-shadow: var(--shadow); }
 .result p { color: var(--ink-2); font-size: 15px; }
 
+/* ---------- baseline progress ---------- */
+.progress-card { background: var(--card); border-radius: var(--r); padding: 16px 18px; margin: 14px 0; box-shadow: var(--shadow); }
+.progress-card p { margin: 8px 0 0; font-size: 15px; }
+.progress-card.ready { background: var(--good-tint); box-shadow: none; }
+.seg-meter { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
+.seg-meter i { height: 6px; border-radius: 3px; background: var(--hair); }
+.seg-meter i.on { background: linear-gradient(90deg, var(--lane-a), var(--lane-b)); }
+
 /* ---------- route list (a real sequence, so numbered) ---------- */
 .road { list-style: none; padding: 6px 18px; margin: 14px 0; position: relative; background: var(--card); border-radius: var(--r); box-shadow: var(--shadow); }
 .road::before { content: ''; position: absolute; left: 31px; top: 26px; bottom: 26px; width: 3px; border-radius: 2px; background: linear-gradient(var(--lane-a), var(--lane-b)); }

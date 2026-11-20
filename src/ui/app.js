@@ -2,7 +2,7 @@
 'use strict';
 
 const QRCode = require('qrcode');
-const { computeBaseline, compareToBaseline } = require('../core/baseline');
+const { computeBaseline, compareToBaseline, MIN_READINGS } = require('../core/baseline');
 const { ALERTNESS, SLEEP, departureAdvice, settleSummary, restStopAdvice } = require('../core/advice');
 const { buildRestPlan } = require('../core/plan');
 const { pointAtMinute, unitsForLocale, fmtDistance } = require('../core/geo');
@@ -181,6 +181,23 @@ function readingBars(markersFor, base) {
   </div>`;
 }
 
+/** Progress toward the first baseline, or the moment it becomes ready. */
+function baselineProgress(readingId) {
+  const before = computeBaseline(state.readings.filter((r) => r.id !== readingId));
+  if (before.ready) return '';
+  const after = computeBaseline(state.readings);
+  // A check within 4 h of another replaces it rather than adding one, so the count stays the same.
+  const counted = after.count > before.count;
+  if (after.ready) {
+    return `<section class="progress-card ready">${statusTag('plan', t('scene.ready'))}<p>${t('base.ready')}</p></section>`;
+  }
+  return `<section class="progress-card">
+    <div class="seg-meter" aria-hidden="true">${Array.from({ length: MIN_READINGS }, (_, i) => `<i class="${i < after.count ? 'on' : ''}"></i>`).join('')}</div>
+    <p><b>${t('base.checkN', { n: after.count, needed: MIN_READINGS })}</b></p>
+    ${readingId && !counted && readingById(readingId) && readingById(readingId).quality === 'good' ? `<p class="quiet">${t('base.notCounted')}</p>` : ''}
+  </section>`;
+}
+
 function optionGrid(name, values, labelKey, selected) {
   return `<div class="tiles" data-q="${name}" role="radiogroup">${values.map((v) => `<button class="tile ${selected === v ? 'on' : ''}" role="radio" aria-checked="${selected === v}" data-v="${v}">${t(`${labelKey}.${v}`)}</button>`).join('')}</div>`;
 }
@@ -297,6 +314,7 @@ VIEWS.home = () => {
     <p class="card-sub">${base.ready ? t('home.baseline.ready', { n: base.count }) : t('home.baseline.buildingNote')}</p>
     <div class="card-row">${ICONS.heart}<span>${t('range.pulse')}</span><b>${base.ready ? `${Math.round(base.pulse)} ${t('unit.bpm')}` : '—'}</b></div>
     <div class="card-row">${ICONS.wind}<span>${t('range.breathing')}</span><b>${base.ready ? `${Math.round(base.breathing * 10) / 10} ${t('unit.brpm')}` : '—'}</b></div>
+    ${base.ready ? '' : `<button class="card-link" id="addBase"><span>${t('base.add')}</span>${ICONS.chevron}</button>`}
     <button class="card-link" data-go="history"><span>${last ? `${t('home.last')}: ${esc(last.routeName)}` : t('home.seeHistory')}</span>${ICONS.chevron}</button>`;
   return shell(`
     <div class="hero-grid">
@@ -313,6 +331,8 @@ VIEWS.home = () => {
       ${roadScene(card)}
     </div>`, { wide: true });
 };
+
+AFTER.home = () => on('#addBase', 'click', () => go('check', { kind: 'baseline', seconds: 60 }));
 
 // ---- setup: map route (trip) or hours (shift / no map)
 
@@ -433,6 +453,7 @@ function checkCopy(kind) {
   if (kind === 'departure') return { title: t(m === 'shift' ? 'check.departure.title.shift' : 'check.departure.title'), sub: t('check.departure.sub') };
   if (kind === 'reststop') return { title: t('check.reststop.title'), sub: t('check.reststop.sub') };
   if (kind === 'arrival') return { title: t(m === 'shift' ? 'check.arrival.title.shift' : 'check.arrival.title'), sub: t('check.arrival.sub') };
+  if (kind === 'baseline') return { title: t('check.baseline.title'), sub: t('check.baseline.sub') };
   return { title: t('check.settle.title'), sub: t('check.settle.sub') };
 }
 
@@ -457,7 +478,7 @@ VIEWS.check = () => {
       <div><b id="liveQuality" class="badge">${t('check.settling')}</b><small>&nbsp;</small></div>
     </div>
     <div id="checkError"></div>`, {
-    back: view.kind === 'departure' ? 'home' : 'trip',
+    back: view.kind === 'departure' || view.kind === 'baseline' ? 'home' : 'trip',
     actions: `<button class="btn secondary wide" id="skip">${t('check.skip')}</button>`,
   });
 };
@@ -524,7 +545,7 @@ AFTER.check = () => {
 };
 
 async function afterCheck(result, notice) {
-  const kindMap = { departure: 'departure', reststop: 'reststop', arrival: 'arrival', 'settle-after': 'settle' };
+  const kindMap = { departure: 'departure', reststop: 'reststop', arrival: 'arrival', 'settle-after': 'settle', baseline: 'baseline' };
   const reading = addReading(kindMap[view.kind], result);
   await save();
   const kind = view.kind;
@@ -532,7 +553,24 @@ async function afterCheck(result, notice) {
   else if (kind === 'reststop') go('stopQuestions', { readingId: reading.id, notice, recheck: !!view.recheck });
   else if (kind === 'arrival') go('arrivalQuestions', { readingId: reading.id, notice });
   else if (kind === 'settle-after') finishSettle(reading.id);
+  else if (kind === 'baseline') go('baselineDone', { readingId: reading.id, notice });
 }
+
+// ---- calm check at home (builds the baseline without a trip)
+
+VIEWS.baselineDone = () => {
+  const r = readingById(view.readingId);
+  const good = r && r.quality === 'good';
+  return shell(`
+    ${view.notice ? `<p class="callout care">${t(view.notice)}</p>` : ''}
+    <h1>${t('base.done.title')}</h1>
+    <div class="chips">${sourceChip(r)}</div>
+    ${good ? `<div class="live two"><div><b>${r.pulse}</b><small>${t('check.pulse')}</small></div><div><b>${r.breathing}</b><small>${t('check.breathing')}</small></div></div>` : `<p class="callout care">${t('base.noReading')}</p>`}
+    ${baselineProgress(view.readingId) || `<section class="progress-card ready">${statusTag('plan', t('scene.ready'))}</section>`}`,
+  { back: 'home', actions: `${good ? '' : `<button class="btn secondary wide" id="again">${t('check.retry')}</button>`}<button class="btn primary big wide" data-go="home">${t('base.doneBtn')}</button>` });
+};
+
+AFTER.baselineDone = () => on('#again', 'click', () => go('check', { kind: 'baseline', seconds: 60 }));
 
 // ---- departure questions + result
 
@@ -585,7 +623,7 @@ VIEWS.departureResult = () => {
     return m;
   };
   const cmp = d.comparison.status;
-  const notes = d.settle ? d.advice.notes.filter((n) => n !== 'note.aboveUsual') : d.advice.notes;
+  const notes = (d.settle ? d.advice.notes.filter((n) => n !== 'note.aboveUsual') : d.advice.notes).filter((n) => n !== 'note.building');
   let settleLine = '';
   if (d.settle) {
     const s = d.settle.summary;
@@ -597,7 +635,9 @@ VIEWS.departureResult = () => {
     <h1>${t('result.title')}</h1>
     <div class="chips">${sourceChip(r)}</div>
     ${r && r.quality === 'good' ? readingBars(markers, base) : ''}
-    ${cmp === 'above' ? `<p class="callout care">${t('cmp.above')}</p>` : cmp === 'usual' ? `<p class="callout ok">${t('cmp.usual')}</p>` : cmp === 'building' ? `<p class="quiet">${t('cmp.building')}</p>` : ''}
+    ${cmp === 'above' ? `<p class="callout care">${t('cmp.above')}</p>` : cmp === 'usual' ? `<p class="callout ok">${t('cmp.usual')}</p>` : ''}
+    ${baselineProgress(d.readingId)}
+    ${cmp === 'building' && r && r.quality === 'good' ? `<p class="quiet">${t('base.tripRef')}</p>` : ''}
     ${settleLine}
     ${resultSign(d.advice.level, d.advice.headline, notes)}`, {
     actions: d.advice.level === 'hold'

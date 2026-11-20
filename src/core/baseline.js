@@ -29,12 +29,24 @@ function usualRange(values) {
   return v.length >= 6 ? [quantile(v, 0.2), quantile(v, 0.8)] : [Math.min(...v), Math.max(...v)];
 }
 
-/** Baseline from good-quality camera readings taken at departure. */
+const SPACING_MS = 4 * 3600 * 1000;   // readings closer than 4 h count once, so "usual" spans different days
+
+/** Readings that count toward the baseline: good start-of-trip or calm at-home checks, spaced 4 h apart. */
+function baselineReadings(readings) {
+  const good = (readings || [])
+    .filter((r) => (r.kind === 'departure' || r.kind === 'baseline') && r.quality === 'good' && r.source !== 'questions')
+    .sort((a, b) => b.at - a.at);
+  const kept = [];
+  for (const r of good) {
+    if (!kept.length || kept[kept.length - 1].at - r.at >= SPACING_MS) kept.push(r);
+    if (kept.length === WINDOW) break;
+  }
+  return kept;
+}
+
+/** Baseline from good-quality camera readings taken at the start of trips or as calm checks at home. */
 function computeBaseline(readings) {
-  const usable = (readings || [])
-    .filter((r) => r.kind === 'departure' && r.quality === 'good' && r.source !== 'questions')
-    .sort((a, b) => b.at - a.at)
-    .slice(0, WINDOW);
+  const usable = baselineReadings(readings);
   if (usable.length < MIN_READINGS) {
     return { ready: false, count: usable.length, needed: MIN_READINGS };
   }
@@ -67,4 +79,4 @@ function compareToBaseline(reading, baseline) {
   };
 }
 
-module.exports = { computeBaseline, compareToBaseline, median, quantile, usualRange, MIN_READINGS, ABOVE };
+module.exports = { computeBaseline, baselineReadings, compareToBaseline, median, quantile, usualRange, MIN_READINGS, ABOVE, SPACING_MS };

@@ -48,14 +48,27 @@ npm start
 
 Allow camera access, accept the consent screen, choose your kind of driving, then tap **Start a trip** (or **Start a shift**).
 
+**Windows shortcut:** after the first setup, double-click **Start Rydra.bat** in the project folder to open the app. You can right-click it and choose *Send to > Desktop (create shortcut)*.
+
+### New drivers and the baseline
+
+Rydra compares each driver only with their own usual readings, so it needs 3 good checks before it can say "higher than usual." Until then:
+
+- advice comes from the driver's answers (sleep, alertness), so the safety rules work from day one;
+- break checks on the first trip are compared with that trip's start reading;
+- each early check shows progress ("Check 2 of 3"), and the third shows "Your baseline is ready";
+- drivers can speed it up with **Add a calm check at home** on the home screen. Only one check every 4 hours counts, so the baseline reflects different times and days.
+
+Rydra deliberately does not compare drivers with population "normal" ranges: that would be a health judgement.
+
 ### Other ways to run it
 
 | Command | What it does |
 | --- | --- |
-| `npm run seed` | Starts the app with six past departure checks added (labelled "Seeded demo data"), so the baseline comparison works straight away. Use this for judging and the demo video. |
+| `npm run seed` | Starts the app with six past departure checks added (once; running it again doesn't add more) (labelled "Seeded demo data"), so the baseline comparison works straight away. Use this for judging and the demo video. |
 | `npm run demo` | Runs with a **simulated sensor** and no camera or API key. Every reading is labelled "Demo sensor." For UI development only. |
 | `npm test` | Runs the logic tests (baseline, advice rules, rest plans, badge, retention). |
-| `npm run dist:mac` / `dist:win` / `dist:linux` | Builds an installer with electron-builder. |
+| `npm run dist:mac` / `dist:win` / `dist:linux` | Builds an installer with electron-builder, into the `release` folder. |
 
 No login is needed.
 

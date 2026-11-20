@@ -13,7 +13,8 @@ const { prune, normalize } = require('../src/core/store');
 const { seedDemoData } = require('../src/core/seed');
 const { summarize, collect } = require('../src/sensor/summarize');
 
-const good = (pulse, breathing, extra = {}) => Object.assign({ kind: 'departure', quality: 'good', source: 'camera', at: Date.now(), pulse, breathing }, extra);
+let clock = Date.now();
+const good = (pulse, breathing, extra = {}) => Object.assign({ kind: 'departure', quality: 'good', source: 'camera', at: (clock -= 86400000), pulse, breathing }, extra);
 
 test('baseline needs three good departure readings', () => {
   assert.equal(computeBaseline([good(70, 14), good(72, 15)]).ready, false);
@@ -194,4 +195,19 @@ test('every advice code has text in every language, and none claim safety', () =
 
 test('translations only use keys that exist in English', () => {
   for (const [lang, d] of Object.entries(DICTS)) for (const k of Object.keys(d)) assert.ok(k in DICTS.en, `${lang} has unknown key ${k}`);
+});
+
+test('checks closer than 4 hours count once toward the baseline', () => {
+  const now = Date.now();
+  const r = (mins, kind = 'baseline') => ({ kind, quality: 'good', source: 'camera', at: now - mins * 60000, pulse: 70, breathing: 14 });
+  assert.equal(computeBaseline([r(0), r(10), r(20)]).ready, false);
+  assert.equal(computeBaseline([r(0), r(10), r(20)]).count, 1);
+  assert.equal(computeBaseline([r(0), r(300), r(600, 'departure')]).ready, true);
+  assert.equal(computeBaseline([r(0, 'arrival'), r(300, 'reststop'), r(600)]).count, 1);
+});
+
+test('seeding twice does not duplicate demo data', () => {
+  const once = seedDemoData(null);
+  const twice = seedDemoData(once);
+  assert.equal(twice.readings.length, once.readings.length);
 });
