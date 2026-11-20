@@ -249,7 +249,7 @@ main.center { text-align: center; padding-top: 140px; }
 .pin-next { background: var(--blue); color: #fff; box-shadow: 0 0 0 4px #fff, 0 0 0 10px rgba(61, 107, 245, 0.22); }
 
 /* ---------- camera ---------- */
-.camera { position: relative; background: #15181c; border-radius: 24px; overflow: hidden; aspect-ratio: 16 / 10; margin: 16px 0 12px; box-shadow: var(--shadow); }
+.camera { position: relative; background: #15181c; border-radius: 24px; overflow: hidden; aspect-ratio: 16 / 10; max-height: 46vh; width: 100%; margin: 16px 0 12px; box-shadow: var(--shadow); }
 .camera video { width: 100%; height: 100%; object-fit: cover; transform: scaleX(-1); display: block; }
 .oval { position: absolute; inset: 0; width: 100%; height: 100%; }
 .oval ellipse { transition: stroke 0.3s; }

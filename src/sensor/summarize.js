@@ -7,8 +7,10 @@ const { median } = require('../core/baseline');
 const MIN_STABLE_PULSE = 3;
 const MIN_STABLE_BREATH = 1;
 
-function summarize({ pulse = [], breathing = [], hrv = [] }) {
-  const good = pulse.length >= MIN_STABLE_PULSE && breathing.length >= MIN_STABLE_BREATH;
+function summarize({ pulse = [], breathing = [], hrv = [] }, { breathingOnly = false } = {}) {
+  // Good = enough stable breathing, plus enough stable pulse unless pulse wasn't measured at all
+  // (breathing-only mode on setups where the SDK can't run pulse).
+  const good = breathing.length >= MIN_STABLE_BREATH && (pulse.length >= MIN_STABLE_PULSE || (pulse.length === 0 && breathingOnly));
   const round1 = (x) => (x == null ? null : Math.round(x * 10) / 10);
   return {
     pulse: pulse.length ? Math.round(median(pulse)) : null,

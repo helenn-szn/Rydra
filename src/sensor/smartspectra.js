@@ -3,7 +3,7 @@
 
 const {
   SmartSpectraSDK, ProcessingStatus, ValidationCode, SmartSpectraErrorCode,
-  breathingMetrics, cardioMetrics,
+  breathingMetrics, MetricType,
 } = require('@smartspectra/node-sdk/renderer');
 const { decodeMetrics } = require('@smartspectra/node-sdk/messages');
 const { summarize, collect } = require('./summarize');
@@ -27,6 +27,14 @@ const HINTS = {
   [ValidationCode.kExcessiveMotion]: 'motion',
 };
 
+// What Rydra asks the SDK for. Arterial pressure (part of the SDK's "cardio" bundle) is left out:
+// Rydra never uses it, and it needs extra model setup that can fail with "configuration failed".
+const FULL_METRICS = [...breathingMetrics, MetricType.PULSE_RATE, MetricType.HRV];
+const BREATHING_ONLY = [...breathingMetrics];
+
+// Errors that mean the requested measurements can't run here; Rydra retries once with breathing only.
+const RETRY_BREATHING_ONLY = new Set([SmartSpectraErrorCode.kConfigurationFailed, SmartSpectraErrorCode.kMetricNotAuthorized]);
+
 // Errors that mean "could not reach Presage". The app falls back to a questions-only check.
 const CONNECTION_ERRORS = new Set([
   SmartSpectraErrorCode.kNetworkError, SmartSpectraErrorCode.kServerError,
@@ -38,6 +46,23 @@ class SmartSpectraSensor {
     this.apiKey = apiKey;
     this.telemetry = !!telemetry;
     this.label = 'SmartSpectra camera';
+    this.breathingOnly = false;   // set after a fallback, so later checks skip the failing setup
+  }
+
+  async measure(opts) {
+    try {
+      return await this.measureWith(this.breathingOnly ? BREATHING_ONLY : FULL_METRICS, opts);
+    } catch (err) {
+      if (!this.breathingOnly && RETRY_BREATHING_ONLY.has(err.code) && !(opts.abort && opts.abort.aborted)) {
+        console.warn('[rydra] SmartSpectra rejected pulse + HRV; retrying with breathing only.', err.code, err.message);
+        this.breathingOnly = true;
+        this.label = 'SmartSpectra camera (breathing only)';
+        if (opts.onHint) opts.onHint('tuning');
+        const r = await this.measureWith(BREATHING_ONLY, opts);
+        return Object.assign(r, { limited: true });
+      }
+      throw err;
+    }
   }
 
   /**
@@ -45,11 +70,11 @@ class SmartSpectraSensor {
    * @param {{seconds:number, video?:HTMLVideoElement, onLive?:Function, onHint?:Function, onRunning?:Function, abort?:{aborted:boolean}}} opts
    * @returns {Promise<{pulse,breathing,hrv,quality,samples,source:'camera'}>}
    */
-  measure({ seconds, video, onLive, onHint, onRunning, abort }) {
+  measureWith(requestedMetrics, { seconds, video, onLive, onHint, onRunning, abort }) {
     const acc = { pulse: [], breathing: [], hrv: [] };
     const sdk = new SmartSpectraSDK({
       apiKey: this.apiKey,
-      requestedMetrics: [...breathingMetrics, ...cardioMetrics],
+      requestedMetrics,
       enableTelemetry: this.telemetry,
     });
 
@@ -65,23 +90,25 @@ class SmartSpectraSensor {
         try { await sdk.stop(); } catch { /* already stopped */ }
         try { sdk.destroy(); } catch { /* ignore */ }
         if (video) video.srcObject = null;
-        if (err) reject(err); else resolve(Object.assign(summarize(acc), { source: 'camera' }));
+        if (err) reject(err); else resolve(Object.assign(summarize(acc, { breathingOnly: requestedMetrics === BREATHING_ONLY }), { source: 'camera' }));
       };
 
       sdk.on('streamAvailable', (stream) => { if (video) video.srcObject = stream; });
       sdk.on('validationStatus', (code) => onHint && onHint(HINTS[code] || 'ok'));
       sdk.on('metrics', (buf) => {
         collect(decodeMetrics(buf), acc);
-        if (onLive) onLive(summarize(acc));
+        if (onLive) onLive(summarize(acc, { breathingOnly: requestedMetrics === BREATHING_ONLY }));
       });
       sdk.on('processingStatus', (status) => {
+        if (status === ProcessingStatus.kStarting && onHint) onHint('connecting');
         if (status === ProcessingStatus.kRunning && !timer) {
           if (onRunning) onRunning();
           timer = setTimeout(() => finish(), seconds * 1000);
         }
       });
       sdk.on('error', (code, message) => {
-        const e = new Error(message || 'SmartSpectra error');
+        console.error('[rydra] SmartSpectra error', code, message);
+        const e = new Error(`${message || 'SmartSpectra error'} (code ${code})`);
         e.code = code;
         e.connection = CONNECTION_ERRORS.has(code);
         finish(e);
@@ -105,6 +132,7 @@ class SmartSpectraSensor {
       }, 200);
 
       sdk.start().catch((err) => {
+        console.error('[rydra] SmartSpectra start failed', err.code, err.message);
         err.connection = err.connection || CONNECTION_ERRORS.has(err.code);
         finish(err);
       });

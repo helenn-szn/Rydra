@@ -504,7 +504,7 @@ AFTER.check = () => {
   const onHint = (code) => {
     const el = $('hint'); if (!el) return;
     el.textContent = t(`hint.${code || 'ok'}`);
-    if (code === 'tuning' || code === 'lowFps') return;
+    if (code === 'tuning' || code === 'lowFps' || code === 'connecting') return;
     // The SDK reports one issue at a time. A group turns red when it is the issue, and green once
     // the SDK reports "ok" or has moved on to a different issue.
     for (const [g, codes] of Object.entries(QUALITY_GROUPS)) {
