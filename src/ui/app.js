@@ -640,7 +640,9 @@ AFTER.departureQuestions = () => {
 };
 
 VIEWS.departureResult = () => {
-  const d = journey().departure;
+  const j0 = journey();
+  if (!j0 || !j0.departure) { view = { name: 'trip' }; return VIEWS.trip(); }
+  const d = j0.departure;
   const r = readingById(d.readingId);
   const after = d.settle ? readingById(d.settle.afterId) : null;
   const base = computeBaseline(state.readings.filter((x) => x.id !== d.readingId && (!after || x.id !== after.id)));
@@ -804,7 +806,16 @@ AFTER.badge = () => {
 VIEWS.trip = () => {
   const j = journey();
   if (!j) return VIEWS.home();
-  if (!j.plan) return shell(`<h1>${t('result.title')}</h1>`, { actions: `<button class="btn primary big wide" data-go="departureResult">${t('setup.continue')}</button>` });
+  if (!j.plan) {
+    // The check-in for this trip wasn't finished (e.g. the camera stopped). Offer a clear way on.
+    if (!j.departure) {
+      return shell(`<h1>${t('trip.unfinished')}</h1><p class="lead">${esc(j.routeName)}</p>`, {
+        back: 'home',
+        actions: `<button class="btn primary big wide" id="redoCheck">${t('trip.restartCheck')}</button><button class="btn secondary wide" id="cancelTrip">${t('trip.cancel')}</button>`,
+      });
+    }
+    return shell(`<h1>${t('result.title')}</h1>`, { back: 'home', actions: `<button class="btn primary big wide" data-go="departureResult">${t('setup.continue')}</button>` });
+  }
   const done = stopsChecked(j);
   const next = j.plan.stops[done];
   const elapsed = j.leftAt ? (Date.now() - j.leftAt) / 60000 : 0;
@@ -830,6 +841,13 @@ VIEWS.trip = () => {
 
 AFTER.trip = () => {
   const j = journey();
+  on('#redoCheck', 'click', () => go('check', { kind: 'departure', seconds: 60 }));
+  on('#cancelTrip', 'click', async () => {
+    state.journeys = state.journeys.filter((x) => x.id !== state.activeJourneyId);
+    state.activeJourneyId = null;
+    await save();
+    go('home');
+  });
   if (!j || !j.plan) return;
   const done = stopsChecked(j);
   if (j.route) drawRoute($('map'), { path: j.route.path, from: j.route.from, to: j.route.to, stops: j.plan.stops.map((s, i) => ({ lat: s.lat, lon: s.lon, name: stopLabel(s, i) })), nextIndex: done, interactive: false });
