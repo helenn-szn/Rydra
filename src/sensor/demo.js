@@ -23,12 +23,14 @@ class DemoSensor {
     const ticks = Math.max(1, Math.round(seconds * 2));
 
     return new Promise((resolve, reject) => {
-      if (onHint) onHint('Demo sensor: no camera is used.');
+      if (onHint) onHint('tuning');
       if (onRunning) onRunning();
       let i = 0;
       const iv = setInterval(() => {
         if (abort && abort.aborted) { clearInterval(iv); const e = new Error('Cancelled'); e.cancelled = true; reject(e); return; }
         i += 1;
+        if (onHint && i === 2) onHint('tooDark');
+        if (onHint && i === 4) onHint('ok');
         if (i > 4) acc.pulse.push(centre.pulse + jitter(2));
         if (i > 8 && i % 3 === 0) acc.breathing.push(centre.breathing + jitter(0.6));
         if (seconds >= 60 && i > 20 && i % 5 === 0) acc.hrv.push(42 + jitter(6));

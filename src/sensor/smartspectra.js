@@ -8,22 +8,23 @@ const {
 const { decodeMetrics } = require('@smartspectra/node-sdk/messages');
 const { summarize, collect } = require('./summarize');
 
+// SDK validation codes -> Rydra hint keys (translated in the UI and grouped into light / position / stillness).
 const HINTS = {
-  [ValidationCode.kOk]: null,
-  [ValidationCode.kNoFaceFound]: 'Look at the camera so your face is in view.',
-  [ValidationCode.kMultipleFacesFound]: 'Only the driver should be in view.',
-  [ValidationCode.kFaceNotCentered]: 'Move to the centre of the picture.',
-  [ValidationCode.kFaceTooClose]: 'Move back a little.',
-  [ValidationCode.kFaceTooFar]: 'Come a little closer.',
-  [ValidationCode.kFaceTooHigh]: 'Lower the camera or yourself a little.',
-  [ValidationCode.kFaceTooLow]: 'Raise the camera a little.',
-  [ValidationCode.kFaceNotForward]: 'Face the camera straight on.',
-  [ValidationCode.kTooDark]: 'Too dark. Move to better light.',
-  [ValidationCode.kTooBright]: 'Too bright. Move out of direct sun.',
-  [ValidationCode.kChestNotVisible]: 'Sit back so your upper chest is in view.',
-  [ValidationCode.kCameraTuning]: 'Adjusting the camera…',
-  [ValidationCode.kFrameRateTooLow]: 'The camera is too slow. Close other apps.',
-  [ValidationCode.kExcessiveMotion]: 'Try to sit still.',
+  [ValidationCode.kOk]: 'ok',
+  [ValidationCode.kNoFaceFound]: 'noFace',
+  [ValidationCode.kMultipleFacesFound]: 'multipleFaces',
+  [ValidationCode.kFaceNotCentered]: 'notCentered',
+  [ValidationCode.kFaceTooClose]: 'tooClose',
+  [ValidationCode.kFaceTooFar]: 'tooFar',
+  [ValidationCode.kFaceTooHigh]: 'tooHigh',
+  [ValidationCode.kFaceTooLow]: 'tooLow',
+  [ValidationCode.kFaceNotForward]: 'notForward',
+  [ValidationCode.kTooDark]: 'tooDark',
+  [ValidationCode.kTooBright]: 'tooBright',
+  [ValidationCode.kChestNotVisible]: 'chestNotVisible',
+  [ValidationCode.kCameraTuning]: 'tuning',
+  [ValidationCode.kFrameRateTooLow]: 'lowFps',
+  [ValidationCode.kExcessiveMotion]: 'motion',
 };
 
 // Errors that mean "could not reach Presage". The app falls back to a questions-only check.
@@ -68,7 +69,7 @@ class SmartSpectraSensor {
       };
 
       sdk.on('streamAvailable', (stream) => { if (video) video.srcObject = stream; });
-      sdk.on('validationStatus', (code) => onHint && onHint(HINTS[code] ?? null));
+      sdk.on('validationStatus', (code) => onHint && onHint(HINTS[code] || 'ok'));
       sdk.on('metrics', (buf) => {
         collect(decodeMetrics(buf), acc);
         if (onLive) onLive(summarize(acc));

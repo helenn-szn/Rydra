@@ -1,14 +1,14 @@
 // Passenger badge: proves a check-in happened. Contains NO health data, ever.
 'use strict';
 
-function badgeText({ checkedAt, routeName, stopCount }) {
+function badgeText({ checkedAt, routeName, stopCount, mode }) {
   const d = new Date(checkedAt);
-  const when = `${d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })} ${d.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}`;
+  const when = `${d.toISOString().slice(0, 10)} ${d.toTimeString().slice(0, 5)}`;
   return [
-    'Rydra: driver pre-trip check-in completed',
+    `Rydra: driver ${mode === 'shift' ? 'start-of-shift' : 'pre-trip'} check-in completed`,
     `When: ${when}`,
-    routeName ? `Route: ${routeName}` : null,
-    `Rest plan: ${stopCount} planned ${stopCount === 1 ? 'stop' : 'stops'}`,
+    routeName ? `${mode === 'shift' ? 'Shift' : 'Route'}: ${routeName}` : null,
+    `Rest plan: ${stopCount} planned ${stopCount === 1 ? 'break' : 'breaks'}`,
     'This badge contains no health data.',
   ].filter(Boolean).join('\n');
 }

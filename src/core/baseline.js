@@ -14,6 +14,21 @@ function median(values) {
   return v.length % 2 ? v[mid] : (v[mid - 1] + v[mid]) / 2;
 }
 
+function quantile(values, q) {
+  const v = values.filter((x) => Number.isFinite(x)).sort((a, b) => a - b);
+  if (!v.length) return null;
+  const pos = (v.length - 1) * q;
+  const lo = Math.floor(pos); const hi = Math.ceil(pos);
+  return v[lo] + (v[hi] - v[lo]) * (pos - lo);
+}
+
+/** "Usual range": middle 60% once there are 6+ readings, otherwise the full spread. */
+function usualRange(values) {
+  const v = values.filter((x) => Number.isFinite(x));
+  if (!v.length) return null;
+  return v.length >= 6 ? [quantile(v, 0.2), quantile(v, 0.8)] : [Math.min(...v), Math.max(...v)];
+}
+
 /** Baseline from good-quality camera readings taken at departure. */
 function computeBaseline(readings) {
   const usable = (readings || [])
@@ -23,11 +38,15 @@ function computeBaseline(readings) {
   if (usable.length < MIN_READINGS) {
     return { ready: false, count: usable.length, needed: MIN_READINGS };
   }
+  const pulses = usable.map((r) => r.pulse);
+  const breaths = usable.map((r) => r.breathing);
   return {
     ready: true,
     count: usable.length,
-    pulse: median(usable.map((r) => r.pulse)),
-    breathing: median(usable.map((r) => r.breathing)),
+    pulse: median(pulses),
+    breathing: median(breaths),
+    pulseRange: usualRange(pulses),
+    breathingRange: usualRange(breaths),
   };
 }
 
@@ -48,4 +67,4 @@ function compareToBaseline(reading, baseline) {
   };
 }
 
-module.exports = { computeBaseline, compareToBaseline, median, MIN_READINGS, ABOVE };
+module.exports = { computeBaseline, compareToBaseline, median, quantile, usualRange, MIN_READINGS, ABOVE };

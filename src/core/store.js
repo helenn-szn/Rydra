@@ -1,13 +1,14 @@
 // Shape of everything Rydra keeps, plus retention. All of it lives on the driver's device.
 'use strict';
 
-const CONSENT_VERSION = 1;
+const CONSENT_VERSION = 2;   // v2 added the optional map (OpenStreetMap lookups)
 
 function emptyState() {
   return {
     version: 1,
     consent: null,                       // { at, version }
-    settings: { retentionDays: 90, telemetry: false },
+    introSeen: false,
+    settings: { retentionDays: 90, telemetry: false, lang: null, theme: 'auto', profile: null, units: null, map: true },
     readings: [],                        // numbers only: pulse, breathing, hrv, quality. Never video.
     journeys: [],
     activeJourneyId: null,

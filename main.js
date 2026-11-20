@@ -7,7 +7,7 @@
 
 const fs = require('fs');
 const path = require('path');
-const { app, BrowserWindow, ipcMain, session } = require('electron');
+const { app, BrowserWindow, ipcMain, session, shell } = require('electron');
 
 // Packaged builds ship the native SDK runtime as an extra resource (see package.json#build).
 if (app.isPackaged) {
@@ -73,8 +73,11 @@ function createWindow() {
 
   if (bindSmartSpectraIpc) bindSmartSpectraIpc(win);
 
-  // Rydra only ever shows its own local page.
-  win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
+  // Rydra only ever shows its own local page. Map attribution links open in the system browser.
+  win.webContents.setWindowOpenHandler(({ url }) => {
+    if (/^https:\/\/(www\.)?openstreetmap\.org\//.test(url)) shell.openExternal(url);
+    return { action: 'deny' };
+  });
   win.webContents.on('will-navigate', (event) => event.preventDefault());
   win.loadFile(path.join(__dirname, 'index.html'));
 }
@@ -85,8 +88,19 @@ app.whenReady().then(() => {
     const url = (details && details.requestingUrl) || (wc && wc.getURL()) || '';
     const mediaTypes = (details && details.mediaTypes) || [];
     const cameraOnly = mediaTypes.length === 1 && mediaTypes[0] === 'video';
-    callback(permission === 'media' && cameraOnly && url.startsWith('file://'));
+    const local = url.startsWith('file://');
+    // Camera (video only) for checks; notifications for break reminders. Nothing else.
+    callback(local && ((permission === 'media' && cameraOnly) || permission === 'notifications'));
   });
+
+  // OpenStreetMap's usage policies ask apps to identify themselves.
+  session.defaultSession.webRequest.onBeforeSendHeaders(
+    { urls: ['https://nominatim.openstreetmap.org/*', 'https://tile.openstreetmap.org/*', 'https://router.project-osrm.org/*'] },
+    (details, cb) => {
+      details.requestHeaders['User-Agent'] = `Rydra/${app.getVersion()} (driver rest-planning app; Electron)`;
+      cb({ requestHeaders: details.requestHeaders });
+    },
+  );
 
   if (process.env.MZ_SEED_DEMO === '1') {
     writeStore(seedDemoData(readStore()));

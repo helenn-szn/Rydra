@@ -2,10 +2,15 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <meta http-equiv="Content-Security-Policy"
-        content="default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; worker-src 'self' blob:; media-src blob:;">
+        content="default-src 'self'; style-src 'self' 'unsafe-inline'; font-src 'self'; img-src 'self' data: https://tile.openstreetmap.org; connect-src 'self' https://nominatim.openstreetmap.org https://router.project-osrm.org; worker-src 'self' blob:; media-src blob:;">
+  <meta name="color-scheme" content="light dark">
   <title>Rydra</title>
+  <link rel="stylesheet" href="./node_modules/@fontsource/overpass/400.css">
+  <link rel="stylesheet" href="./node_modules/@fontsource/overpass/600.css">
+  <link rel="stylesheet" href="./node_modules/@fontsource/overpass/800.css">
+  <link rel="stylesheet" href="./node_modules/leaflet/dist/leaflet.css">
   <link rel="stylesheet" href="./styles.css">
 </head>
 <body>

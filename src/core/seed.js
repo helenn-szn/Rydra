@@ -13,6 +13,7 @@ function seedDemoData(existing, now = Date.now()) {
     s.readings.push({ id: newId('r'), at: now - ago * day, kind: 'departure', pulse, breathing, hrv: null, quality: 'good', source: 'seeded' });
   }
   if (!s.consent) s.consent = { at: now - 7 * day, version: CONSENT_VERSION };
+  s.introSeen = true;
   return s;
 }
 
