@@ -35,17 +35,18 @@ const CAMERA = {
   light: { width: 424, height: 320 },       // for slower laptops: a quarter fewer pixels again
 };
 
-async function openCamera(mode) {
+async function openCamera(mode, deviceId) {
   const size = CAMERA[mode] || CAMERA.standard;
+  const pick = deviceId ? { deviceId: { exact: deviceId } } : {};
   try {
     return await navigator.mediaDevices.getUserMedia({
       audio: false,
-      video: { width: { ideal: size.width }, height: { ideal: size.height }, frameRate: { ideal: 30, min: 15 } },
+      video: Object.assign({ width: { ideal: size.width }, height: { ideal: size.height }, frameRate: { ideal: 30, min: 15 } }, pick),
     });
   } catch (err) {
-    // Some webcams reject the frame-rate floor; retry with just the size.
+    // Some cameras reject the frame-rate floor; retry with just the size.
     if (err && err.name === 'OverconstrainedError') {
-      return navigator.mediaDevices.getUserMedia({ audio: false, video: { width: { ideal: size.width }, height: { ideal: size.height } } });
+      return navigator.mediaDevices.getUserMedia({ audio: false, video: Object.assign({ width: { ideal: size.width }, height: { ideal: size.height } }, pick) });
     }
     const e = new Error(err && err.name === 'NotAllowedError'
       ? 'Camera access was blocked. Check Windows Settings > Privacy & security > Camera.'
@@ -139,7 +140,7 @@ class SmartSpectraSensor {
    * @returns {Promise<{pulse,breathing,hrv,quality,samples,source:'camera'}>}
    */
   async measureWith(requestedMetrics, opts) {
-    const stream = await openCamera(this.mode);
+    const stream = await openCamera(this.mode, this.cameraId);
     if (opts.onCamera) watchFrameRate(stream, opts);
     try {
       return await this.run(requestedMetrics, stream, opts);

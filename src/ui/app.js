@@ -33,7 +33,9 @@ let sensor = null;
 function makeSensor() {
   if (config.demoSensor || !config.apiKey) return new DemoSensor();
   const { SmartSpectraSensor } = require('../sensor/smartspectra');
-  return new SmartSpectraSensor({ apiKey: config.apiKey, telemetry: state.settings.telemetry });
+  const s = new SmartSpectraSensor({ apiKey: config.apiKey, telemetry: state.settings.telemetry });
+  s.cameraId = state.settings.cameraId || null;
+  return s;
 }
 
 // ---------------------------------------------------------------- state
@@ -474,7 +476,7 @@ VIEWS.check = () => {
     <ul class="quality" aria-label="Signal">
       ${['light', 'position', 'stillness'].map((g) => `<li id="q-${g}" class="pending"><i></i>${t(`check.${g}`)}</li>`).join('')}
     </ul>
-    <p class="cam-info" id="camInfo" aria-live="off"></p>
+    <div class="cam-row"><p class="cam-info" id="camInfo" aria-live="off"></p><label class="cam-pick" hidden id="camPickWrap">${t('check.camera')}<select id="camPick"></select></label></div>
     <div class="live">
       <div><b id="livePulse">—</b><small>${t('check.pulse')}</small></div>
       <div><b id="liveBreath">—</b><small>${t('check.breathing')}</small></div>
@@ -519,6 +521,24 @@ AFTER.check = () => {
   };
 
   on('#skip', 'click', () => { abort.aborted = true; afterCheck({ source: 'questions', quality: 'none' }, null); });
+
+  // Camera picker: shown when more than one camera is connected (e.g. a phone used as a webcam).
+  if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices && !(sensor instanceof DemoSensor)) {
+    navigator.mediaDevices.enumerateDevices().then((devices) => {
+      const cams = devices.filter((d) => d.kind === 'videoinput');
+      const sel = $('camPick'); const wrap = $('camPickWrap');
+      if (!sel || cams.length < 2) return;
+      sel.innerHTML = cams.map((c, i) => `<option value="${esc(c.deviceId)}" ${c.deviceId === state.settings.cameraId ? 'selected' : ''}>${esc(c.label || `Camera ${i + 1}`)}</option>`).join('');
+      wrap.hidden = false;
+      sel.addEventListener('change', async () => {
+        state.settings.cameraId = sel.value;
+        await save();
+        sensor.cameraId = sel.value;
+        sensor.mode = 'standard';
+        go('check', { kind: view.kind, seconds: view.seconds, recheck: view.recheck });
+      });
+    }).catch(() => {});
+  }
 
   sensor.measure({
     seconds: view.seconds, video: $('video'), abort, onRunning: startCountdown, onHint,
