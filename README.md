@@ -6,6 +6,8 @@ Drivers check their tyres, fuel and engine before a long trip. Rydra is a check 
 
 Built for the Presage SmartSpectra SDK Challenge on DEV.
 
+**Try the web demo:** https://rydra-pi.vercel.app (the full interface with simulated readings, on any device including phones; the real camera check runs in the desktop app below).
+
 > Rydra is a wellness and planning aid. It is **not a medical device** and never says a driver is "safe to drive" or "fatigued."
 
 ## Who it's for
@@ -80,6 +82,7 @@ Rydra deliberately does not compare drivers with population "normal" ranges: tha
 | --- | --- |
 | `npm run seed` | Starts the app with six past departure checks added (once; running it again doesn't add more) (labelled "Seeded demo data"), so the baseline comparison works straight away. Use this for judging and the demo video. |
 | `npm run demo` | Runs with a **simulated sensor** and no camera or API key. Every reading is labelled "Demo sensor." For UI development only. |
+| `npm run build:web` | Builds the browser demo into `web/` (deployed to Vercel from this repo). |
 | `npm test` | Runs the logic tests (baseline, advice rules, rest plans, badge, retention). |
 | `npm run dist:mac` / `dist:win` / `dist:linux` | Builds an installer with electron-builder, into the `release` folder. |
 
