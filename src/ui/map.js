@@ -29,11 +29,11 @@ function drawRoute(el, { path, from, to, stops = [], nextIndex = -1, interactive
 
   const line = path.map((p) => [p.lat, p.lon]);
   if (line.length > 1) {
-    L.polyline(line, { color: '#ffffff', weight: 10, opacity: 0.95, lineCap: 'round' }).addTo(map);
-    L.polyline(line, { color: '#0a6e4e', weight: 6, opacity: 1, lineCap: 'round' }).addTo(map);
+    L.polyline(line, { color: '#ffffff', weight: 9, opacity: 1, lineCap: 'round' }).addTo(map);
+    L.polyline(line, { color: '#8a9dff', weight: 5, opacity: 1, lineCap: 'round' }).addTo(map);
   }
 
-  const pin = (cls, html, title) => L.divIcon({ className: `pin ${cls}`, html, iconSize: [30, 30], iconAnchor: [15, 15], title });
+  const pin = (cls, html, title) => L.divIcon({ className: `pin ${cls}`, html, iconSize: [26, 26], iconAnchor: [13, 13], title });
   if (from) L.marker([from.lat, from.lon], { icon: pin('pin-end', '', from.name), title: from.name, keyboard: false }).addTo(map);
   if (to) L.marker([to.lat, to.lon], { icon: pin('pin-end', '', to.name), title: to.name, keyboard: false }).addTo(map);
   stops.forEach((s, i) => {

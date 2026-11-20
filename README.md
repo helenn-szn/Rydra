@@ -30,9 +30,7 @@ Works anywhere: place search and routing use OpenStreetMap data worldwide. Inter
 | Break check | 30-second check + "How do you feel?" | Change since setting off, plus feeling sleepy, suggests a longer break or a 20-minute nap timer |
 | Arrival / end of shift | Wind-down check | Start-of-trip readings build the baseline for next time |
 
-What the driver says always outranks the camera: "fighting to stay awake" or under 4 hours' sleep means *don't start until rested*, whatever the readings show. Results use road-sign shapes (green panel, yellow diamond, red octagon), so they never rely on colour alone.
-
-Design: Overpass (an open typeface based on the highway-sign alphabet), real sign colours, a day/night display that switches automatically after 7 pm, and large touch targets with the main action pinned under the thumb.
+What the driver says always outranks the camera: "fighting to stay awake" or under 4 hours' sleep means *don't start until rested*, whatever the readings show. Design: a calm, airy interface in Geist, with floating white cards, black pill buttons and a top-down road scene drawn in SVG (the blue-to-violet lane line is the one accent). Status always pairs words with a dot meter (three dots on plan, two take care, one rest first), so it never relies on colour alone. The display switches to night mode after 7 pm, and the main action is pinned under the thumb on small screens.
 
 ## Setup
 

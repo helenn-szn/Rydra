@@ -11,7 +11,8 @@ const { PROFILES, getProfile } = require('../core/profiles');
 const { CONSENT_VERSION, emptyState, normalize, prune, newId } = require('../core/store');
 const { DemoSensor } = require('../sensor/demo');
 const { t, setLang, getLang, detectLang, LANGS } = require('./i18n');
-const { ICONS, signShape } = require('./icons');
+const { ICONS, LOGO, dots, statusTag } = require('./icons');
+const { roadScene } = require('./scene');
 const mapsvc = require('./mapsvc');
 const { drawRoute, destroyMap } = require('./map');
 
@@ -110,17 +111,19 @@ function applyTheme() {
 
 const CAMERA_VIEWS = new Set(['check', 'settle']);
 
-function shell(inner, { back, actions } = {}) {
+function shell(inner, { back, actions, wide } = {}) {
   const demo = sensor && sensor instanceof DemoSensor;
   return `
     <header class="top">
-      ${back ? `<button class="icon-btn" data-go="${back}" aria-label="${t('nav.back')}">${ICONS.back}</button>` : '<span class="icon-btn ghost"></span>'}
-      <span class="wordmark" aria-label="Rydra">Rydra</span>
-      ${CAMERA_VIEWS.has(view.name) ? `<span class="cam-on" role="status"><i></i>${t('camera.on')}</span>` : `<button class="icon-btn" data-go="settings" aria-label="${t('nav.settings')}">${ICONS.gear}</button>`}
+      <div class="top-l">
+        ${back ? `<button class="icon-btn" data-go="${back}" aria-label="${t('nav.back')}">${ICONS.back}</button>` : ''}
+        <span class="brand">${LOGO}<span>Rydra</span></span>
+      </div>
+      ${CAMERA_VIEWS.has(view.name) ? `<span class="cam-on" role="status"><i></i>${t('camera.on')}</span>` : `<button class="pill-btn" data-go="settings">${t('nav.settings')}</button>`}
     </header>
-    ${demo ? `<div class="demo-banner">${t('demo.banner')}</div>` : ''}
-    <main id="main">${inner}</main>
-    ${actions ? `<div class="actions">${actions}</div>` : ''}`;
+    ${demo ? `<p class="demo-note"><span>${t('demo.banner')}</span></p>` : ''}
+    <main id="main" class="${wide ? 'wide' : ''}">${inner}</main>
+    ${actions ? `<div class="actions"><div class="actions-in">${actions}</div></div>` : ''}`;
 }
 
 function bindNav() { on('[data-go]', 'click', (e) => go(e.currentTarget.dataset.go)); }
@@ -131,10 +134,10 @@ function steps(active) {
   return `<ol class="steps" aria-label="Progress">${names.map((n, i) => `<li class="${i < active ? 'done' : i === active ? 'now' : ''}" ${i === active ? 'aria-current="step"' : ''}><span>${t(n)}</span></li>`).join('')}</ol>`;
 }
 
-/** A sign-shaped result: shape + label + headline + notes. */
+/** A result card: status (dots + words), headline, notes. */
 function resultSign(level, headlineKey, notes) {
   return `<section class="result ${level}">
-    <div class="result-head">${signShape(level)}<span class="result-state">${t(`state.${level}`)}</span></div>
+    ${statusTag(level, t(`state.${level}`))}
     <h2>${t(headlineKey)}</h2>
     ${notes.map((n) => `<p>${t(n)}</p>`).join('')}
   </section>`;
@@ -199,17 +202,39 @@ VIEWS.loading = () => `<main class="center"><p>${t('loading')}</p></main>`;
 
 // ---- intro: three cards, shown once
 
+function introCard(i) {
+  if (i === 1) {
+    return `${statusTag('plan', t('check.good'))}
+      <h4>${t('check.departure.title')}</h4><p class="card-sub">${t('check.departure.sub')}</p>
+      <div class="card-row">${ICONS.heart}<span>${t('range.pulse')}</span><b>71 ${t('unit.bpm')}</b></div>
+      <div class="card-row">${ICONS.wind}<span>${t('range.breathing')}</span><b>14 ${t('unit.brpm')}</b></div>`;
+  }
+  if (i === 2) {
+    return `<span class="chip-soft">${t('home.baseline')}</span>
+      <h4>${t('range.usual')}</h4>
+      <div class="mini-range"><i style="left:38%;width:22%"></i><b style="left:47%"></b></div>
+      <div class="card-row">${ICONS.heart}<span>${t('range.pulse')}</span><b>69–72</b></div>`;
+  }
+  return `<span class="chip-soft">${t('trip.next')}</span>
+    <h4>${t('plan.near', { place: 'Lokoja' })}</h4><p class="card-sub">${t('trip.in', { time: dur(80) })}</p>
+    <div class="card-row">${ICONS.clock}<span>${t('btn.nap')}</span></div>`;
+}
+
 VIEWS.intro = () => {
   const i = view.i || 1;
-  return `<main class="intro">
-    <div class="lang-pick">${LANGS.map((l) => `<button class="${getLang() === l.id ? 'on' : ''}" data-lang="${l.id}">${l.name}</button>`).join('')}</div>
-    <div class="intro-art intro-art-${i}" aria-hidden="true"><div class="lane"></div></div>
-    <h1>${t(`intro.${i}.title`)}</h1>
-    <p class="lead">${t(`intro.${i}.body`)}</p>
-    <div class="dots" aria-hidden="true">${[1, 2, 3].map((n) => `<i class="${n === i ? 'on' : ''}"></i>`).join('')}</div>
-    <div class="row">
-      ${i < 3 ? `<button class="btn primary big" id="next">${t('intro.next')}</button><button class="btn text" id="skip">${t('intro.skip')}</button>`
-              : `<button class="btn primary big" id="skip">${t('intro.start')}</button>`}
+  return `<main class="intro wide">
+    <div class="hero-grid">
+      <div class="hero-text">
+        <div class="lang-pick">${LANGS.map((l) => `<button class="${getLang() === l.id ? 'on' : ''}" data-lang="${l.id}">${l.name}</button>`).join('')}</div>
+        <h1 class="display">${t(`intro.${i}.title`)}</h1>
+        <p class="lead">${t(`intro.${i}.body`)}</p>
+        <div class="pager" aria-hidden="true">${[1, 2, 3].map((n) => `<i class="${n === i ? 'on' : ''}"></i>`).join('')}</div>
+        <div class="row">
+          ${i < 3 ? `<button class="btn primary" id="next">${t('intro.next')}</button><button class="btn text" id="skip">${t('intro.skip')}</button>`
+                  : `<button class="btn primary" id="skip">${t('intro.start')}</button>`}
+        </div>
+      </div>
+      ${roadScene(introCard(i))}
     </div>
   </main>`;
 };
@@ -266,27 +291,27 @@ VIEWS.home = () => {
   const base = computeBaseline(state.readings);
   const last = state.journeys.filter((x) => x.endedAt).sort((a, b) => b.endedAt - a.endedAt)[0];
   const p = profile();
+  const card = `
+    ${base.ready ? statusTag('plan', t('scene.ready')) : `<span class="status warn">${dots(Math.min(base.count, 2), 'warn')}<b>${t('scene.building', { n: base.count, needed: base.needed })}</b></span>`}
+    <h4>${t('home.baseline')}</h4>
+    <p class="card-sub">${base.ready ? t('home.baseline.ready', { n: base.count }) : t('home.baseline.buildingNote')}</p>
+    <div class="card-row">${ICONS.heart}<span>${t('range.pulse')}</span><b>${base.ready ? `${Math.round(base.pulse)} ${t('unit.bpm')}` : '—'}</b></div>
+    <div class="card-row">${ICONS.wind}<span>${t('range.breathing')}</span><b>${base.ready ? `${Math.round(base.breathing * 10) / 10} ${t('unit.brpm')}` : '—'}</b></div>
+    <button class="card-link" data-go="history"><span>${last ? `${t('home.last')}: ${esc(last.routeName)}` : t('home.seeHistory')}</span>${ICONS.chevron}</button>`;
   return shell(`
-    <section class="hero">
-      <button class="profile-pill" data-go="profile">${ICONS[p.icon]}<span>${t(`profile.${p.id}`)}</span></button>
-      <h1 class="display">${t(`home.title.${m}`)}</h1>
-    </section>
-    <section class="panel">
-      <h3>${t('home.baseline')}</h3>
-      ${base.ready
-        ? `${readingBars((k) => [{ value: base[k], label: '', kind: 'median' }], base)}<p class="quiet">${t('home.baseline.ready', { n: base.count })}</p>`
-        : `<div class="meter" aria-hidden="true">${Array.from({ length: base.needed }, (_, i) => `<i class="${i < base.count ? 'on' : ''}"></i>`).join('')}</div>
-           <p>${t('home.baseline.building', { n: base.count, needed: base.needed })}</p><p class="quiet">${t('home.baseline.buildingNote')}</p>`}
-    </section>
-    <section class="panel">
-      <h3>${t('home.last')}</h3>
-      ${last ? `<p><b>${esc(last.routeName)}</b></p><p class="quiet">${fmtDate(last.startedAt)}, ${t('history.breaks', { n: last.plan ? last.plan.stops.length : 0, c: stopsChecked(last) })}</p>`
-            : `<p class="quiet">${t('home.none')}</p>`}
-      <button class="btn text" data-go="history">${t('home.seeHistory')}</button>
-    </section>`, {
-    actions: j ? `<button class="btn primary big wide" data-go="trip">${t(`home.continue.${jmode(j)}`)}</button>`
-               : `<button class="btn primary big wide" data-go="setup">${t(`home.start.${m}`)}</button>`,
-  });
+    <div class="hero-grid">
+      <div class="hero-text">
+        <button class="profile-pill" data-go="profile">${ICONS[p.icon]}<span>${t(`profile.${p.id}`)}</span></button>
+        <h1 class="display">${t(`home.title.${m}`)}</h1>
+        <p class="lead">${t(`home.sub.${m}`)}</p>
+        <div class="row">
+          ${j ? `<button class="btn primary" data-go="trip">${t(`home.continue.${jmode(j)}`)}</button>`
+              : `<button class="btn primary" data-go="setup">${t(`home.start.${m}`)}</button>`}
+        </div>
+        <ul class="ticks">${['home.f1', m === 'shift' ? 'home.f2.shift' : 'home.f2', 'home.f3', 'home.f4'].map((k) => `<li>${ICONS.check}${t(k)}</li>`).join('')}</ul>
+      </div>
+      ${roadScene(card)}
+    </div>`, { wide: true });
 };
 
 // ---- setup: map route (trip) or hours (shift / no map)
@@ -715,13 +740,17 @@ VIEWS.trip = () => {
   const next = j.plan.stops[done];
   const elapsed = j.leftAt ? (Date.now() - j.leftAt) / 60000 : 0;
   const left = next ? next.atMin - elapsed : 0;
+  const total = j.plan.stops.length;
+  const card = next
+    ? `<span class="chip-soft">${t('trip.next')}</span>
+       <h4 id="nextName">${esc(stopLabel(next, done))}</h4>
+       <p class="eta" id="eta" aria-live="polite">${left <= 0 ? t('trip.due') : t('trip.in', { time: dur(left) })}</p>
+       <div class="card-row">${ICONS.clock}<span>${t('trip.driving', { time: dur(elapsed) })}</span></div>
+       <div class="card-row">${ICONS.pin}<span>${t('stop.eyebrow', { n: done + 1 })} / ${total}</span>${dots(Math.min(3, Math.ceil(((done) / Math.max(1, total)) * 3)), 'good')}</div>`
+    : `<span class="chip-soft">${t('trip.noMore')}</span><h4>${t('trip.pullOver')}</h4>
+       <div class="card-row">${ICONS.clock}<span>${t('trip.driving', { time: dur(elapsed) })}</span></div>`;
   return shell(`
-    <section class="guide-sign" aria-live="polite">
-      ${next ? `<small>${t('trip.next')}</small><b id="nextName">${esc(stopLabel(next, done))}</b>
-        <span class="eta" id="eta">${left <= 0 ? t('trip.due') : t('trip.in', { time: dur(left) })}</span>`
-             : `<b>${t('trip.noMore')}</b><span class="eta">${t('trip.pullOver')}</span>`}
-    </section>
-    <p class="quiet">${t('trip.driving', { time: dur(elapsed) })}</p>
+    ${roadScene(card, { compact: true })}
     ${j.route ? '<div class="map" id="map"></div>' : ''}
     ${stopList(j, { done })}
     <p class="callout">${t('trip.never')}</p>`, {
@@ -856,7 +885,7 @@ VIEWS.arrivalDone = () => {
   const j = state.journeys.find((x) => x.id === view.journeyId);
   const mins = j.leftAt ? (j.endedAt - j.leftAt) / 60000 : null;
   return shell(`
-    <section class="guide-sign done"><b>${t('arrival.title')}</b>${mins ? `<span class="eta">${t('arrival.onRoad', { time: dur(mins) })}</span>` : ''}</section>
+    ${roadScene(`${statusTag('plan', t('history.done'))}<h4>${t('arrival.title')}</h4>${mins ? `<p class="card-sub">${t('arrival.onRoad', { time: dur(mins) })}</p>` : ''}`, { compact: true })}
     <p>${t('arrival.checked', { n: stopsChecked(j), total: j.plan ? j.plan.stops.length : 0 })}</p>
     ${j.arrival.feeling <= 2 ? `<p class="callout care">${t('arrival.sleepy')}</p>` : ''}
     <p class="quiet">${t('arrival.note')}</p>`, { actions: `<button class="btn primary big wide" data-go="home">${t('arrival.done')}</button>` });
