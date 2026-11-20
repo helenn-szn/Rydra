@@ -103,6 +103,16 @@ function createWindow() {
   win.loadFile(path.join(__dirname, 'index.html'));
 }
 
+// Only one Rydra at a time: two copies fight over the camera and its frame rate drops.
+if (!app.requestSingleInstanceLock()) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    const win = BrowserWindow.getAllWindows()[0];
+    if (win) { if (win.isMinimized()) win.restore(); win.focus(); }
+  });
+}
+
 app.whenReady().then(() => {
   // Grant the camera only, only to our own bundled page. No microphone.
   session.defaultSession.setPermissionRequestHandler((wc, permission, callback, details) => {
