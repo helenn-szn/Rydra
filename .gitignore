@@ -4,3 +4,4 @@ dist/
 *.log
 release/
 tools/sdk-repro/renderer.bundle.js
+config-check-log.txt
