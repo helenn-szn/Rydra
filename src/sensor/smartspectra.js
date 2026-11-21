@@ -198,12 +198,14 @@ class SmartSpectraSensor {
         const reading = err ? null : Object.assign(summarize(acc, { breathingOnly: requestedMetrics === BREATHING_ONLY }), { source: 'camera' });
         const t0 = performance.now();
         const secs = runningAt ? (performance.now() - runningAt) / 1000 : 0;
-        console.log(`[rydra] check finished after ${secs.toFixed(1)} s; SDK processed ${sent} frames (${secs ? (sent / secs).toFixed(1) : '?'} per second); stopping in the background`);
+        console.log(`[rydra] END (${err ? 'SDK error' : 'time up'}) after ${secs.toFixed(1)} s; SDK processed ${sent} frames (${secs ? (sent / secs).toFixed(1) : '?'} per second)`);
         this.stopping = (async () => {
-          try { await sdk.stop(); } catch (e) { console.warn('[rydra] stop failed', e && e.message); }
+          console.log('[rydra] BEFORE sdk.stop() (in the background)');
+          try { await sdk.stop(); console.log(`[rydra] AFTER sdk.stop(): resolved in ${Math.round(performance.now() - t0)} ms`); }
+          catch (e) { console.warn(`[rydra] AFTER sdk.stop(): threw after ${Math.round(performance.now() - t0)} ms`, e && e.message); }
           // After an SDK error the session must be reset before it can start again.
           if (err && !err.cancelled) { try { await sdk.reset(); } catch { /* best effort */ } }
-          console.log(`[rydra] SmartSpectra stopped in ${Math.round(performance.now() - t0)} ms`);
+          console.log(`[rydra] SmartSpectra session ready for the next check (${Math.round(performance.now() - t0)} ms after the end)`);
         })().finally(() => { this.stopping = null; });
         if (err) reject(err); else resolve(reading);
       };

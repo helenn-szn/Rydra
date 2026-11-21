@@ -238,6 +238,7 @@ const VIEWS = {};
 const AFTER = {};
 
 function render() {
+  if (view.name !== 'check' && view.name !== 'settle') requestAnimationFrame(() => console.log(`[rydra] screen shown: ${view.name}`));
   applyTheme();
   document.body.classList.toggle('camera-live', CAMERA_VIEWS.has(view.name));
   const fn = VIEWS[view.name] || VIEWS.home;
@@ -604,9 +605,11 @@ AFTER.check = () => {
 };
 
 async function afterCheck(result, notice) {
+  console.log(`[rydra] result received (${result.quality || 'none'}); saving`);
   const kindMap = { departure: 'departure', reststop: 'reststop', arrival: 'arrival', 'settle-after': 'settle', baseline: 'baseline' };
   const reading = addReading(kindMap[view.kind], result);
   await save();
+  console.log('[rydra] result saved; showing the next screen');
   const kind = view.kind;
   if (kind === 'departure') go('departureQuestions', { readingId: reading.id, notice });
   else if (kind === 'reststop') go('stopQuestions', { readingId: reading.id, notice, recheck: !!view.recheck });

@@ -162,7 +162,7 @@ let lastTick = Date.now();
 setInterval(() => {
   const now = Date.now();
   const lag = now - lastTick - 250;
-  if (lag > 1000) console.log(`[rydra] main process was blocked for ${lag} ms (just before ${new Date(now).toLocaleTimeString('en-GB', { hour12: false })})`);
+  if (lag > 500) console.log(`[rydra] MAIN PROCESS BLOCKED for ${lag} ms (just before ${new Date(now).toLocaleTimeString('en-GB', { hour12: false })})`);
   lastTick = now;
 }, 250).unref();
 
