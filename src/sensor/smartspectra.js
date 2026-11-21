@@ -87,10 +87,9 @@ function watchFrameRate(stream, { onCamera, abort }) {
 
 // What Rydra asks the SDK for. Arterial pressure (part of the SDK's "cardio" bundle) is left out:
 // Rydra never uses it, and it needs extra model setup that can fail with "configuration failed".
-// HRV is left out by default: it adds per-frame processing that, on ordinary laptops, let frames queue up
-// behind the SDK and froze the app at the end of a check. Pulse and breathing are what Rydra compares.
-const FULL_METRICS = [...breathingMetrics, MetricType.PULSE_RATE];
-const LIGHT_METRICS = FULL_METRICS;   // light mode differs only in camera size
+const FULL_METRICS = [...breathingMetrics, MetricType.PULSE_RATE, MetricType.HRV];
+// Light mode (after a low-frame-rate stop) also skips HRV, the heaviest extra measurement.
+const LIGHT_METRICS = [...breathingMetrics, MetricType.PULSE_RATE];
 const BREATHING_ONLY = [...breathingMetrics];
 
 // Errors that mean the requested measurements can't run here; Rydra retries once with breathing only.
