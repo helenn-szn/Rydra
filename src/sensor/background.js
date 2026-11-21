@@ -103,14 +103,27 @@ class BackgroundSensor {
     return new Promise((resolve, reject) => {
       let done = false;
       let running = false;
+      let lastLive = null;
+      let overrun = null;
       const off = window.mz.sensor.onEvent((m) => {
         if (m.id !== id || done) return;
         if (m.type === 'status') {
           if (m.status === ProcessingStatus.kStarting && onHint) onHint('connecting');
-          if (m.status === ProcessingStatus.kRunning && !running) { running = true; console.log(`[rydra] check running (${seconds} s)`); if (onRunning) onRunning(); }
+          if (m.status === ProcessingStatus.kRunning && !running) {
+            running = true; console.log(`[rydra] check running (${seconds} s)`); if (onRunning) onRunning();
+            // Failsafe: if no result arrives 15 s after the check should have ended, stop waiting.
+            // Use the last live reading if there is a usable one; otherwise report the problem.
+            overrun = setTimeout(() => {
+              if (done) return;
+              console.warn('[rydra] no result 15 s after the check ended; using the last live reading');
+              end(); window.mz.sensor.reset();
+              if (lastLive && lastLive.quality && lastLive.quality !== 'none') resolve(Object.assign(lastLive, { source: 'camera' }, this.videoFile ? { fromVideo: true } : {}));
+              else { const e = new Error('The camera check did not finish. Please try again.'); e.code = 'overrun'; reject(e); }
+            }, (seconds + 15) * 1000);
+          }
         } else if (m.type === 'hint') { if (onHint) onHint(HINTS[m.code] || 'ok'); }
         else if (m.type === 'camera') { if (onCamera) onCamera({ width: m.width, height: m.height, fps: m.fps }); }
-        else if (m.type === 'live') { if (onLive) onLive(m.reading); }
+        else if (m.type === 'live') { lastLive = m.reading; if (onLive) onLive(m.reading); }
         else if (m.type === 'result') {
           end(); console.log(`[rydra] result from the camera engine: ${m.frames} frames in ${m.secs.toFixed(1)} s`);
           resolve(this.videoFile ? Object.assign(m.reading, { fromVideo: true }) : m.reading);
@@ -124,7 +137,7 @@ class BackgroundSensor {
         }
       });
       const poll = setInterval(() => { if (abort && abort.aborted) window.mz.sensor.cancel(); }, 200);
-      function end() { done = true; off(); clearInterval(poll); if (video) video.srcObject = null; }
+      function end() { done = true; off(); clearInterval(poll); clearTimeout(overrun); if (video) video.srcObject = null; }
       window.mz.sensor.start({
         id, apiKey: this.apiKey, telemetry: this.telemetry, metrics, cameraId: this.cameraId,
         width: size.width, height: size.height, seconds, breathingOnly: metrics === BREATHING_ONLY,

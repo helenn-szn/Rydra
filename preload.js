@@ -19,6 +19,7 @@ contextBridge.exposeInMainWorld('mz', {
     start: (opts) => ipcRenderer.invoke('mz:sensor:start', opts),
     cancel: () => ipcRenderer.send('mz:sensor:cancel'),
     pickVideo: () => ipcRenderer.invoke('mz:sensor:pickVideo'),
+    reset: () => ipcRenderer.send('mz:sensor:reset'),
     onEvent: (cb) => {
       const h = (_e, msg) => cb(msg);
       ipcRenderer.on('mz:sensor:event', h);

@@ -21,7 +21,12 @@ let stopping = null;      // promise while a previous check is stopping
 let previewPort = null;
 
 // Heartbeat: lets the window's process notice if this process stops responding.
-setInterval(() => send({ type: 'tick' }), 1000);
+let beat = 0;
+setInterval(() => {
+  send({ type: 'tick' });
+  beat += 1;
+  if (check && beat % 10 === 0) log('still working…');
+}, 1000);
 
 async function session(apiKey, metrics, telemetry, source) {
   // A new session when anything changes, including camera <-> video file (the SDK won't switch source mid-session).
@@ -97,13 +102,25 @@ function startFrameSource({ file, cameraName, onFrame, onEnd, onError }) {
   const frameBytes = W * H * 3;
   let pending = Buffer.alloc(0);
   let errText = '';
+  const queue = [];
+  let pumping = false;
+  let dropped = 0;
+  // One frame per turn of the event loop, so SmartSpectra's callbacks, timers and the heartbeat
+  // always get a turn. If more than a few frames wait, the oldest are dropped instead of piling up.
+  const pump = () => {
+    const frame = queue.shift();
+    if (!frame) { pumping = false; return; }
+    onFrame(frame, W, H);
+    setImmediate(pump);
+  };
   p.stdout.on('data', (chunk) => {
     pending = pending.length ? Buffer.concat([pending, chunk]) : chunk;
     while (pending.length >= frameBytes) {
-      const frame = Buffer.from(pending.subarray(0, frameBytes));
+      queue.push(Buffer.from(pending.subarray(0, frameBytes)));
       pending = pending.subarray(frameBytes);
-      onFrame(frame, W, H);
     }
+    while (queue.length > 3) { queue.shift(); dropped += 1; if (dropped % 30 === 1) log(`falling behind: ${dropped} frames skipped so far`); }
+    if (!pumping) { pumping = true; setImmediate(pump); }
   });
   p.stderr.on('data', (d) => { errText = (errText + d).slice(-1500); });
   p.on('error', (e) => onError(`Could not start ffmpeg: ${e.message}`));
@@ -202,7 +219,10 @@ async function start(opts) {
           let ts = file ? n * 33333 : Number((process.hrtime.bigint() - t0) / 1000n);
           if (ts <= lastTs) ts = lastTs + 1;
           lastTs = ts;
+          const t1 = Date.now();
           try { if (s.sendFrame(buf, w, h, w * 3, 0, ts) !== false) { frames += 1; framesThisSecond += 1; } } catch (err) { log(`sendFrame: ${err.message}`); }
+          const took = Date.now() - t1;
+          if (took > 500) log(`SmartSpectra took ${took} ms to accept one frame`);
           n += 1;
           if (n % 5 === 0) sendPreview(buf, w, h, w * 3, 0);
         },

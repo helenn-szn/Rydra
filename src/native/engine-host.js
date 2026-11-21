@@ -131,6 +131,11 @@ function startEngineHost(getWindow) {
   });
 
   ipcMain.on('mz:sensor:cancel', () => { if (child) child.postMessage({ type: 'cancel' }); });
+  // Last resort from the window: the check overran badly, so end the engine; the next check starts a fresh one.
+  ipcMain.on('mz:sensor:reset', () => {
+    console.log(`[rydra ${stamp()}] the check did not finish in time; restarting the camera engine`);
+    if (child) { const c = child; child = null; current = null; try { c.kill(); } catch { /* gone */ } }
+  });
 
   app.on('will-quit', () => { if (child) { try { child.kill(); } catch { /* gone */ } } });
   return { warmUp: () => engine() };
