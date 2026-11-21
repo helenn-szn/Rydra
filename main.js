@@ -117,6 +117,9 @@ function createWindow() {
 
 // Only one Rydra at a time: two copies fight over the camera and its frame rate drops.
 if (!app.requestSingleInstanceLock()) {
+  console.log('\n[rydra] Rydra is already running, so this copy is closing.');
+  console.log('[rydra] If you cannot see it, it may be frozen: open Task Manager (Ctrl+Shift+Esc),');
+  console.log('[rydra] end every "Electron" or "Rydra" task, then start Rydra again.\n');
   app.quit();
 } else {
   app.on('second-instance', () => {
