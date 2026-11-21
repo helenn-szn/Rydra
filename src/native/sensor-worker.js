@@ -135,7 +135,7 @@ async function start(opts) {
       s.useFile(file, { interframeDelayMs: 33 });
     } else {
       s.useCamera(cameraId ? CameraSelection.byId(cameraId) : CameraSelection.default,
-        { width: width || 0, height: height || 0, fps: 30 });
+        width ? { width, height, fps: 30 } : {});   // {} = the camera's own default format
     }
     s.start();
   } catch (e) {

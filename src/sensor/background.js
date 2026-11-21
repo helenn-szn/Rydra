@@ -6,7 +6,7 @@
 const { ValidationCode, SmartSpectraErrorCode, ProcessingStatus, breathingMetrics, MetricType } = require('@smartspectra/node-sdk/renderer');
 const { HINTS } = require('./hints');
 
-const SIZES = { standard: { width: 640, height: 480 }, light: { width: 320, height: 240 } };
+const SIZES = { standard: { width: 640, height: 480 }, light: { width: 320, height: 240 }, native: { width: 0, height: 0 } };
 const FULL_METRICS = [...breathingMetrics, MetricType.PULSE_RATE, MetricType.HRV];
 const LIGHT_METRICS = [...breathingMetrics, MetricType.PULSE_RATE];
 const BREATHING_ONLY = [...breathingMetrics];
@@ -71,6 +71,12 @@ class BackgroundSensor {
       return await this.measureWith(this.metrics(), opts);
     } catch (err) {
       if (opts.abort && opts.abort.aborted) throw err;
+      // Code 7: SmartSpectra couldn't open the camera with the size we asked for. Retry once with the camera's own format.
+      if (err.code === SmartSpectraErrorCode.kInputUnavailable && this.mode !== 'native') {
+        console.warn('[rydra] Camera would not open at the requested size; retrying with its own default format.');
+        this.mode = 'native';
+        return this.measure(opts);
+      }
       if (err.code === SmartSpectraErrorCode.kSustainedLowFrameRate && this.mode === 'standard') {
         console.warn('[rydra] Low frame rate; retrying in light camera mode.');
         this.mode = 'light';
