@@ -36,6 +36,12 @@ let sensor = null;
 function makeSensor() {
   if (sensor && sensor.dispose) sensor.dispose();
   if (config.demoSensor || !config.apiKey) return new DemoSensor();
+  if (config.engine === 'background') {
+    const { BackgroundSensor } = require('../sensor/background');
+    const s = new BackgroundSensor({ apiKey: config.apiKey, telemetry: state.settings.telemetry });
+    s.cameraId = state.settings.nativeCameraId || null;
+    return s;
+  }
   const { SmartSpectraSensor } = require('../sensor/smartspectra');
   const s = new SmartSpectraSensor({ apiKey: config.apiKey, telemetry: state.settings.telemetry });
   s.cameraId = state.settings.cameraId || null;
@@ -216,6 +222,8 @@ function optionGrid(name, values, labelKey, selected) {
 /** Video cameras with readable names. Windows hides names until camera permission is granted,
  *  so if names are blank (and no check is running) we open the camera for a moment to unlock them. */
 async function listCameras({ probe = false } = {}) {
+  // The background camera engine has its own camera list (SmartSpectra opens the camera itself).
+  if (sensor && sensor.native) return sensor.listCameras();
   if (!navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) return [];
   let cams = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'videoinput');
   if (probe && cams.some((c) => !c.label)) {
@@ -228,8 +236,12 @@ async function listCameras({ probe = false } = {}) {
   return cams.map((c, i) => ({ id: c.deviceId, name: c.label || `${t('check.camera')} ${i + 1}` }));
 }
 
+// Browser camera ids and the background engine's camera ids are different, so they're saved separately.
+const camKey = () => (sensor && sensor.native ? 'nativeCameraId' : 'cameraId');
+
 function cameraOptions(cams) {
-  return `<option value="">${t('settings.cameraAuto')}</option>` + cams.map((c) => `<option value="${esc(c.id)}" ${c.id === state.settings.cameraId ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
+  const cur = state.settings[camKey()];
+  return `<option value="">${t('settings.cameraAuto')}</option>` + cams.map((c) => `<option value="${esc(c.id)}" ${c.id === cur ? 'selected' : ''}>${esc(c.name)}</option>`).join('');
 }
 
 // ---------------------------------------------------------------- render
@@ -561,9 +573,9 @@ AFTER.check = () => {
     sel.innerHTML = cameraOptions(cams);
     wrap.hidden = false;
     sel.addEventListener('change', async () => {
-      state.settings.cameraId = sel.value || null;
+      state.settings[camKey()] = sel.value || null;
       await save();
-      sensor.cameraId = state.settings.cameraId;
+      sensor.cameraId = sel.value || null;
       sensor.mode = 'standard';
       go('check', { kind: view.kind, seconds: view.seconds, recheck: view.recheck });
     });
@@ -1079,8 +1091,8 @@ AFTER.settings = () => {
       camSel.innerHTML = cameraOptions(cams);
     });
     camSel.addEventListener('change', async () => {
-      state.settings.cameraId = camSel.value || null;
-      if (sensor) { sensor.cameraId = state.settings.cameraId; sensor.mode = 'standard'; }
+      state.settings[camKey()] = camSel.value || null;
+      if (sensor) { sensor.cameraId = camSel.value || null; sensor.mode = 'standard'; }
       await save();
     });
   }

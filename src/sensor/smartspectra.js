@@ -8,24 +8,7 @@ const {
 const { decodeMetrics } = require('@smartspectra/node-sdk/messages');
 const { summarize, collect } = require('./summarize');
 
-// SDK validation codes -> Rydra hint keys (translated in the UI and grouped into light / position / stillness).
-const HINTS = {
-  [ValidationCode.kOk]: 'ok',
-  [ValidationCode.kNoFaceFound]: 'noFace',
-  [ValidationCode.kMultipleFacesFound]: 'multipleFaces',
-  [ValidationCode.kFaceNotCentered]: 'notCentered',
-  [ValidationCode.kFaceTooClose]: 'tooClose',
-  [ValidationCode.kFaceTooFar]: 'tooFar',
-  [ValidationCode.kFaceTooHigh]: 'tooHigh',
-  [ValidationCode.kFaceTooLow]: 'tooLow',
-  [ValidationCode.kFaceNotForward]: 'notForward',
-  [ValidationCode.kTooDark]: 'tooDark',
-  [ValidationCode.kTooBright]: 'tooBright',
-  [ValidationCode.kChestNotVisible]: 'chestNotVisible',
-  [ValidationCode.kCameraTuning]: 'tuning',
-  [ValidationCode.kFrameRateTooLow]: 'lowFps',
-  [ValidationCode.kExcessiveMotion]: 'motion',
-};
+const { HINTS } = require('./hints');
 
 // Rydra opens the camera itself at a modest resolution. The SDK's default (1280x720) has to be copied
 // from the window to the SDK frame by frame, and on many laptops that pushes the frame rate below what

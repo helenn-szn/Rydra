@@ -22,10 +22,14 @@ app.commandLine.appendSwitch('disable-renderer-backgrounding');
 app.commandLine.appendSwitch('disable-background-timer-throttling');
 
 const DEMO_SENSOR = process.env.MZ_DEMO_SENSOR === '1';
+// Camera engine. 'background' (default): SmartSpectra runs in its own process and reads the camera
+// itself, so it can't freeze the window. 'window' (MZ_ENGINE=window): the old in-window setup.
+const ENGINE = DEMO_SENSOR ? 'demo' : process.env.MZ_ENGINE === 'window' ? 'window' : 'background';
 let bindSmartSpectraIpc = null;
-if (!DEMO_SENSOR) {
+if (ENGINE === 'window') {
   ({ bindSmartSpectraIpc } = require('@smartspectra/node-sdk/main'));
 }
+let engineHost = null;
 
 const { seedDemoData } = require('./src/core/seed');
 
@@ -71,6 +75,7 @@ ipcMain.handle('mz:config', () => ({
   apiKey: process.env.SMARTSPECTRA_API_KEY || savedKey(),
   keySource: process.env.SMARTSPECTRA_API_KEY ? 'env' : savedKey() ? 'settings' : 'none',
   demoSensor: DEMO_SENSOR,
+  engine: ENGINE,
   platform: process.platform,
 }));
 
@@ -162,6 +167,12 @@ app.whenReady().then(() => {
     console.log('[rydra] Seeded demo history into', storeFile());
   }
 
+  if (ENGINE === 'background') {
+    const { startEngineHost } = require('./src/native/engine-host');
+    engineHost = startEngineHost(() => BrowserWindow.getAllWindows()[0]);
+    engineHost.warmUp();   // start the engine now so the first check doesn't wait for it
+    console.log('[rydra] camera engine: background process');
+  }
   createWindow();
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });
