@@ -52,6 +52,7 @@ class BackgroundSensor {
     this.mode = 'standard';
     this.cameraId = null;     // native camera id from listCameras()
     this.native = true;       // the UI uses listCameras() below instead of the browser's list
+    this.videoFile = null;    // set to a recorded video's path to check from that instead of the camera
   }
 
   dispose() { try { window.mz.sensor.cancel(); } catch { /* window closing */ } }
@@ -104,7 +105,10 @@ class BackgroundSensor {
         } else if (m.type === 'hint') { if (onHint) onHint(HINTS[m.code] || 'ok'); }
         else if (m.type === 'camera') { if (onCamera) onCamera({ width: m.width, height: m.height, fps: m.fps }); }
         else if (m.type === 'live') { if (onLive) onLive(m.reading); }
-        else if (m.type === 'result') { end(); console.log(`[rydra] result from the camera engine: ${m.frames} frames in ${m.secs.toFixed(1)} s`); resolve(m.reading); }
+        else if (m.type === 'result') {
+          end(); console.log(`[rydra] result from the camera engine: ${m.frames} frames in ${m.secs.toFixed(1)} s`);
+          resolve(this.videoFile ? Object.assign(m.reading, { fromVideo: true }) : m.reading);
+        }
         else if (m.type === 'error') {
           end();
           const e = new Error(m.cancelled ? 'Cancelled' : `${m.message || 'SmartSpectra error'} (code ${m.code})`);
@@ -118,6 +122,7 @@ class BackgroundSensor {
       window.mz.sensor.start({
         id, apiKey: this.apiKey, telemetry: this.telemetry, metrics, cameraId: this.cameraId,
         width: size.width, height: size.height, seconds, breathingOnly: metrics === BREATHING_ONLY,
+        file: this.videoFile || undefined,
       }).catch((err) => { if (!done) { end(); reject(err); } });
     });
   }

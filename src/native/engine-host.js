@@ -3,8 +3,11 @@
 // ended and started again, so a stuck SmartSpectra session never freezes Rydra.
 'use strict';
 
+const fs = require('fs');
 const path = require('path');
-const { app, ipcMain, utilityProcess, MessageChannelMain } = require('electron');
+const { app, ipcMain, dialog, BrowserWindow, utilityProcess, MessageChannelMain } = require('electron');
+
+const VIDEO_EXT = ['mp4', 'mov', 'm4v', 'avi', 'mkv', 'webm'];
 
 const stamp = () => new Date().toLocaleTimeString('en-GB', { hour12: false });
 const STUCK_MS = 10000;   // no heartbeat for this long during a check = stuck
@@ -69,7 +72,23 @@ function startEngineHost(getWindow) {
     setTimeout(() => { if (pending.has(reqId)) { pending.delete(reqId); resolve([]); } }, 8000);
   }));
 
+  // Recorded-video checks: only a file the person picked, with a video extension, that exists.
+  let pickedVideo = null;
+  ipcMain.handle('mz:sensor:pickVideo', async () => {
+    const r = await dialog.showOpenDialog(BrowserWindow.getAllWindows()[0], {
+      title: 'Choose a recorded video of your face', properties: ['openFile'],
+      filters: [{ name: 'Video', extensions: VIDEO_EXT }],
+    });
+    if (r.canceled || !r.filePaths[0]) return null;
+    pickedVideo = r.filePaths[0];
+    return pickedVideo;
+  });
+
   ipcMain.handle('mz:sensor:start', (_e, opts) => {
+    if (opts.file) {
+      const ext = path.extname(opts.file).slice(1).toLowerCase();
+      if (!VIDEO_EXT.includes(ext) || !fs.existsSync(opts.file)) throw new Error('That video file could not be found. Choose it again in Settings.');
+    }
     const e = engine();
     current = opts.id;
     lastTick = Date.now();

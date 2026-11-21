@@ -23,8 +23,9 @@ let previewPort = null;
 // Heartbeat: lets the window's process notice if this process stops responding.
 setInterval(() => send({ type: 'tick' }), 1000);
 
-function session(apiKey, metrics, telemetry) {
-  const key = `${apiKey}|${metrics.join(',')}|${telemetry}`;
+function session(apiKey, metrics, telemetry, source) {
+  // A new session when anything changes, including camera <-> video file (the SDK won't switch source mid-session).
+  const key = `${apiKey}|${metrics.join(',')}|${telemetry}|${source}`;
   if (sdk && sdkKey === key) return sdk;
   if (sdk) { try { sdk.destroy(); } catch { /* already gone */ } }
   sdk = new SmartSpectraSDK({
@@ -68,10 +69,10 @@ async function start(opts) {
     log('waiting for the previous check to finish stopping…');
     await Promise.race([stopping, new Promise((r) => setTimeout(r, 15000))]);
   }
-  const { id, apiKey, telemetry, metrics, cameraId, width, height, seconds, breathingOnly } = opts;
+  const { id, apiKey, telemetry, metrics, cameraId, width, height, seconds, breathingOnly, file } = opts;
   const acc = { pulse: [], breathing: [], hrv: [] };
   let s;
-  try { s = session(apiKey, metrics, telemetry); }
+  try { s = session(apiKey, metrics, telemetry, file ? 'file' : 'camera'); }
   catch (e) { send({ type: 'error', id, code: e.code, message: e.message }); return; }
 
   let frames = 0; let framesThisSecond = 0; let runningAt = 0; let timer = null; let lastLive = 0;
@@ -105,6 +106,12 @@ async function start(opts) {
 
   s.on('processingStatus', (status) => {
     send({ type: 'status', id, status });
+    // A video file can end before the check time is up: use what was measured.
+    if (file && runningAt && (status === ProcessingStatus.kIdle || status === ProcessingStatus.kStopping)) {
+      log('video file finished');
+      finish(null);
+      return;
+    }
     if (status === ProcessingStatus.kRunning && !runningAt) {
       runningAt = Date.now();
       log(`check running (${seconds} s, metrics ${metrics.join(',')})`);
@@ -122,8 +129,14 @@ async function start(opts) {
   s.on('error', (code, message) => { log(`SmartSpectra error ${code}: ${message}`); finish({ code, message }); });
 
   try {
-    s.useCamera(cameraId ? CameraSelection.byId(cameraId) : CameraSelection.default,
-      { width: width || 0, height: height || 0, fps: 30 });
+    if (file) {
+      log(`reading a recorded video instead of the camera: ${file}`);
+      // Played at normal speed so the check takes as long as it would with a camera.
+      s.useFile(file, { interframeDelayMs: 33 });
+    } else {
+      s.useCamera(cameraId ? CameraSelection.byId(cameraId) : CameraSelection.default,
+        { width: width || 0, height: height || 0, fps: 30 });
+    }
     s.start();
   } catch (e) {
     log(`start failed: ${e.code} ${e.message}`);
