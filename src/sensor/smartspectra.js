@@ -30,9 +30,12 @@ const HINTS = {
 // Rydra opens the camera itself at a modest resolution. The SDK's default (1280x720) has to be copied
 // from the window to the SDK frame by frame, and on many laptops that pushes the frame rate below what
 // the SDK needs ("frame rate stayed too low", code 14). 640x480 at 30 fps is plenty for a face.
+// Every frame is copied from the window to the SDK in full, so frame size sets the frame rate the SDK
+// actually receives. On a typical laptop 640x480 arrived at only 15-20 fps (below what the SDK needs),
+// even with the camera itself delivering 30. A face at arm's length is still well covered at these sizes.
 const CAMERA = {
-  standard: { width: 640, height: 480 },
-  light: { width: 424, height: 320 },       // for slower laptops: a quarter fewer pixels again
+  standard: { width: 480, height: 360 },    // ~0.7 MB per frame, about half of 640x480
+  light: { width: 320, height: 240 },       // fallback after a low-frame-rate stop: ~0.3 MB per frame
 };
 
 async function openCamera(mode, deviceId) {
