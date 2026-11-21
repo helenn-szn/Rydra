@@ -94,17 +94,17 @@ function createWindow() {
 
   if (bindSmartSpectraIpc) bindSmartSpectraIpc(win);
 
-  // Debug launcher (SMARTSPECTRA_DIAGNOSTICS=1): mirror the app's console into this terminal,
-  // and say when the window stops or resumes responding.
-  if (process.env.SMARTSPECTRA_DIAGNOSTICS === '1') {
-    const stamp = () => new Date().toISOString().slice(11, 23);
-    win.webContents.on('console-message', (e, _level, message) => {
-      const msg = e && e.message !== undefined ? e.message : message;   // newer and older Electron signatures
-      console.log(`[app ${stamp()}] ${msg}`);
-    });
-    win.on('unresponsive', () => console.log(`[rydra ${stamp()}] window became UNRESPONSIVE`));
-    win.on('responsive', () => console.log(`[rydra ${stamp()}] window responsive again`));
-  }
+  // Terminal logging. Always: Rydra's own messages and errors (cheap). With the debug launcher
+  // (SMARTSPECTRA_DIAGNOSTICS=1): everything except the per-frame chatter, which itself slows the app.
+  const stamp = () => new Date().toLocaleTimeString('en-GB', { hour12: false }) + '.' + String(Date.now() % 1000).padStart(3, '0');
+  const debug = process.env.SMARTSPECTRA_DIAGNOSTICS === '1';
+  const CHATTY = /frameSentThrough|<- metrics|<- validationStatus|forwarded \d+ frames/;
+  win.webContents.on('console-message', (e, _level, message) => {
+    const msg = String(e && e.message !== undefined ? e.message : message);   // newer and older Electron signatures
+    if (debug ? !CHATTY.test(msg) : /\[rydra\]|error/i.test(msg)) console.log(`[app ${stamp()}] ${msg}`);
+  });
+  win.on('unresponsive', () => console.log(`[rydra ${stamp()}] window became UNRESPONSIVE`));
+  win.on('responsive', () => console.log(`[rydra ${stamp()}] window responsive again`));
 
   // Rydra only ever shows its own local page. Map attribution links open in the system browser.
   win.webContents.setWindowOpenHandler(({ url }) => {
@@ -156,6 +156,15 @@ app.whenReady().then(() => {
   createWindow();
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });
+
+// Reports when the main process is blocked (it is what Windows calls "Not Responding").
+let lastTick = Date.now();
+setInterval(() => {
+  const now = Date.now();
+  const lag = now - lastTick - 250;
+  if (lag > 1000) console.log(`[rydra] main process was blocked for ${lag} ms (just before ${new Date(now).toLocaleTimeString('en-GB', { hour12: false })})`);
+  lastTick = now;
+}, 250).unref();
 
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
 

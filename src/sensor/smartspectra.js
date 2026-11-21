@@ -87,8 +87,10 @@ function watchFrameRate(stream, { onCamera, abort }) {
 
 // What Rydra asks the SDK for. Arterial pressure (part of the SDK's "cardio" bundle) is left out:
 // Rydra never uses it, and it needs extra model setup that can fail with "configuration failed".
-const FULL_METRICS = [...breathingMetrics, MetricType.PULSE_RATE, MetricType.HRV];
-const LIGHT_METRICS = [...breathingMetrics, MetricType.PULSE_RATE];   // no HRV: less processing per frame
+// HRV is left out by default: it adds per-frame processing that, on ordinary laptops, let frames queue up
+// behind the SDK and froze the app at the end of a check. Pulse and breathing are what Rydra compares.
+const FULL_METRICS = [...breathingMetrics, MetricType.PULSE_RATE];
+const LIGHT_METRICS = FULL_METRICS;   // light mode differs only in camera size
 const BREATHING_ONLY = [...breathingMetrics];
 
 // Errors that mean the requested measurements can't run here; Rydra retries once with breathing only.
@@ -196,7 +198,8 @@ class SmartSpectraSensor {
         // which can take several seconds, so it runs in the background and the next check waits for it.
         const reading = err ? null : Object.assign(summarize(acc, { breathingOnly: requestedMetrics === BREATHING_ONLY }), { source: 'camera' });
         const t0 = performance.now();
-        console.log('[rydra] check finished; stopping SmartSpectra in the background');
+        const secs = runningAt ? (performance.now() - runningAt) / 1000 : 0;
+        console.log(`[rydra] check finished after ${secs.toFixed(1)} s; SDK processed ${sent} frames (${secs ? (sent / secs).toFixed(1) : '?'} per second); stopping in the background`);
         this.stopping = (async () => {
           try { await sdk.stop(); } catch (e) { console.warn('[rydra] stop failed', e && e.message); }
           // After an SDK error the session must be reset before it can start again.
@@ -214,9 +217,14 @@ class SmartSpectraSensor {
         collect(decodeMetrics(buf), acc);
         if (onLive) onLive(summarize(acc, { breathingOnly: requestedMetrics === BREATHING_ONLY }));
       });
+      let sent = 0;
+      let runningAt = 0;
+      sdk.on('frameSentThrough', (ok) => { if (ok !== false) sent += 1; });
       sdk.on('processingStatus', (status) => {
         if (status === ProcessingStatus.kStarting && onHint) onHint('connecting');
         if (status === ProcessingStatus.kRunning && !timer) {
+          runningAt = performance.now();
+          console.log(`[rydra] check running (${seconds} s, ${requestedMetrics.length} measurements)`);
           if (onRunning) onRunning();
           timer = setTimeout(() => finish(), seconds * 1000);
         }
