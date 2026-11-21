@@ -106,6 +106,27 @@ class SmartSpectraSensor {
     this.mode = 'standard';       // switches to 'light' after a low-frame-rate stop, for the rest of the session
   }
 
+  /**
+   * One SDK session, reused for every check. Presage's SDK is built to stop and start a single
+   * session; destroying it unloads models on the app's main thread, which can freeze the window
+   * ("Not Responding"). A new session is made only when the requested measurements change.
+   */
+  session(requestedMetrics) {
+    if (this.sdk && this.sdkMetrics === requestedMetrics) return this.sdk;
+    this.dispose();
+    this.sdk = new SmartSpectraSDK({ apiKey: this.apiKey, requestedMetrics, enableTelemetry: this.telemetry });
+    this.sdkMetrics = requestedMetrics;
+    return this.sdk;
+  }
+
+  /** Fully release the SDK (app closing, or switching measurements). */
+  dispose() {
+    if (!this.sdk) return;
+    try { this.sdk.destroy(); } catch { /* already gone */ }
+    this.sdk = null;
+    this.sdkMetrics = null;
+  }
+
   metrics() {
     if (this.breathingOnly) return BREATHING_ONLY;
     return this.mode === 'light' ? LIGHT_METRICS : FULL_METRICS;
@@ -151,11 +172,7 @@ class SmartSpectraSensor {
 
   run(requestedMetrics, stream, { seconds, video, onLive, onHint, onRunning, abort }) {
     const acc = { pulse: [], breathing: [], hrv: [] };
-    const sdk = new SmartSpectraSDK({
-      apiKey: this.apiKey,
-      requestedMetrics,
-      enableTelemetry: this.telemetry,
-    });
+    const sdk = this.session(requestedMetrics);
 
     return new Promise((resolve, reject) => {
       let timer = null;
@@ -166,8 +183,10 @@ class SmartSpectraSensor {
         if (finished) return;
         finished = true;
         clearTimeout(timer); clearTimeout(watchdog); clearInterval(abortPoll);
+        // Stop (not destroy) so the session can be reused for the next check.
         try { await sdk.stop(); } catch { /* already stopped */ }
-        try { sdk.destroy(); } catch { /* ignore */ }
+        // After an SDK error the session must be reset before it can start again.
+        if (err && !err.cancelled) { try { await sdk.reset(); } catch { /* best effort */ } }
         if (video) video.srcObject = null;
         if (err) reject(err); else resolve(Object.assign(summarize(acc, { breathingOnly: requestedMetrics === BREATHING_ONLY }), { source: 'camera' }));
       };

@@ -34,6 +34,7 @@ let config = { apiKey: '', demoSensor: true };
 let sensor = null;
 
 function makeSensor() {
+  if (sensor && sensor.dispose) sensor.dispose();
   if (config.demoSensor || !config.apiKey) return new DemoSensor();
   const { SmartSpectraSensor } = require('../sensor/smartspectra');
   const s = new SmartSpectraSensor({ apiKey: config.apiKey, telemetry: state.settings.telemetry });
@@ -1118,6 +1119,7 @@ AFTER.settings = () => {
   if (browserPreview) window.__rydra = { state: () => state, sensor: () => sensor, go, save };
   timers = [];
   setInterval(applyTheme, 5 * 60 * 1000);
+  window.addEventListener('beforeunload', () => { if (sensor && sensor.dispose) sensor.dispose(); });
   if (!state.introSeen) return go('intro', { i: 1 });
   if (!state.consent || state.consent.version < CONSENT_VERSION) return go('consent');
   if (!state.settings.profile) return go('profile');
