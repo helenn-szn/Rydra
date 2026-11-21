@@ -94,6 +94,18 @@ function createWindow() {
 
   if (bindSmartSpectraIpc) bindSmartSpectraIpc(win);
 
+  // Debug launcher (SMARTSPECTRA_DIAGNOSTICS=1): mirror the app's console into this terminal,
+  // and say when the window stops or resumes responding.
+  if (process.env.SMARTSPECTRA_DIAGNOSTICS === '1') {
+    const stamp = () => new Date().toISOString().slice(11, 23);
+    win.webContents.on('console-message', (e, _level, message) => {
+      const msg = e && e.message !== undefined ? e.message : message;   // newer and older Electron signatures
+      console.log(`[app ${stamp()}] ${msg}`);
+    });
+    win.on('unresponsive', () => console.log(`[rydra ${stamp()}] window became UNRESPONSIVE`));
+    win.on('responsive', () => console.log(`[rydra ${stamp()}] window responsive again`));
+  }
+
   // Rydra only ever shows its own local page. Map attribution links open in the system browser.
   win.webContents.setWindowOpenHandler(({ url }) => {
     if (/^https:\/\/(www\.)?openstreetmap\.org\//.test(url)) shell.openExternal(url);

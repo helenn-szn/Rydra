@@ -161,6 +161,11 @@ class SmartSpectraSensor {
    * @returns {Promise<{pulse,breathing,hrv,quality,samples,source:'camera'}>}
    */
   async measureWith(requestedMetrics, opts) {
+    // A previous check may still be stopping in the background; wait (up to 15 s) before reusing the session.
+    if (this.stopping) {
+      console.log('[rydra] waiting for the previous check to finish stopping…');
+      await Promise.race([this.stopping, new Promise((r) => setTimeout(r, 15000))]);
+    }
     const stream = await openCamera(this.mode, this.cameraId);
     if (opts.onCamera) watchFrameRate(stream, opts);
     try {
@@ -179,16 +184,23 @@ class SmartSpectraSensor {
       let watchdog = null;
       let finished = false;
 
-      const finish = async (err) => {
+      const finish = (err) => {
         if (finished) return;
         finished = true;
         clearTimeout(timer); clearTimeout(watchdog); clearInterval(abortPoll);
-        // Stop (not destroy) so the session can be reused for the next check.
-        try { await sdk.stop(); } catch { /* already stopped */ }
-        // After an SDK error the session must be reset before it can start again.
-        if (err && !err.cancelled) { try { await sdk.reset(); } catch { /* best effort */ } }
         if (video) video.srcObject = null;
-        if (err) reject(err); else resolve(Object.assign(summarize(acc, { breathingOnly: requestedMetrics === BREATHING_ONLY }), { source: 'camera' }));
+        // Hand the result to the app straight away. Stopping the SDK drains its processing pipeline,
+        // which can take several seconds, so it runs in the background and the next check waits for it.
+        const reading = err ? null : Object.assign(summarize(acc, { breathingOnly: requestedMetrics === BREATHING_ONLY }), { source: 'camera' });
+        const t0 = performance.now();
+        console.log('[rydra] check finished; stopping SmartSpectra in the background');
+        this.stopping = (async () => {
+          try { await sdk.stop(); } catch (e) { console.warn('[rydra] stop failed', e && e.message); }
+          // After an SDK error the session must be reset before it can start again.
+          if (err && !err.cancelled) { try { await sdk.reset(); } catch { /* best effort */ } }
+          console.log(`[rydra] SmartSpectra stopped in ${Math.round(performance.now() - t0)} ms`);
+        })().finally(() => { this.stopping = null; });
+        if (err) reject(err); else resolve(reading);
       };
 
       sdk.useMediaStream(stream);
