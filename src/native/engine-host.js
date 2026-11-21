@@ -7,7 +7,30 @@ const fs = require('fs');
 const path = require('path');
 const { app, ipcMain, dialog, BrowserWindow, utilityProcess, MessageChannelMain } = require('electron');
 
-const VIDEO_EXT = ['mp4', 'mov', 'm4v', 'avi', 'mkv', 'webm'];
+const VIDEO_EXT = ['mp4', 'mov', 'm4v', 'avi', 'mkv', 'webm', '3gp'];
+
+function convertVideo(input, output) {
+  const { spawn } = require('child_process');
+  let ffmpeg = require('ffmpeg-static');
+  if (ffmpeg) ffmpeg = ffmpeg.replace('app.asar', 'app.asar.unpacked');
+  return new Promise((resolve, reject) => {
+    const args = ['-y', '-i', input,
+      // shorter side 480 px, 30 fps, H.264, no sound, max 3 minutes
+      '-vf', "scale='if(gt(iw,ih),-2,480)':'if(gt(iw,ih),480,-2)',fps=30",
+      '-t', '180', '-c:v', 'libx264', '-preset', 'veryfast', '-crf', '20', '-pix_fmt', 'yuv420p', '-an',
+      '-movflags', '+faststart', output];
+    console.log(`[rydra] converting the video for SmartSpectra: ${path.basename(input)}`);
+    const t0 = Date.now();
+    const p = spawn(ffmpeg, args, { windowsHide: true });
+    let errText = '';
+    p.stderr.on('data', (d) => { errText = (errText + d).slice(-2000); });
+    p.on('error', (e) => reject(new Error(`Could not start the video converter: ${e.message}`)));
+    p.on('close', (code) => {
+      if (code === 0) { console.log(`[rydra] video ready in ${((Date.now() - t0) / 1000).toFixed(1)} s`); resolve(); }
+      else { console.log(errText); reject(new Error('That video could not be converted. Try recording it again in the normal camera mode.')); }
+    });
+  });
+}
 
 const stamp = () => new Date().toLocaleTimeString('en-GB', { hour12: false });
 const STUCK_MS = 10000;   // no heartbeat for this long during a check = stuck
@@ -80,8 +103,12 @@ function startEngineHost(getWindow) {
       filters: [{ name: 'Video', extensions: VIDEO_EXT }],
     });
     if (r.canceled || !r.filePaths[0]) return null;
-    pickedVideo = r.filePaths[0];
-    return pickedVideo;
+    // Phones often record HEVC, rotated, at a variable frame rate. SmartSpectra's video reader
+    // can't open some of these (code 7), so make a plain H.264 copy at 30 fps first.
+    const out = path.join(app.getPath('userData'), 'rydra-check-video.mp4');
+    await convertVideo(r.filePaths[0], out);
+    pickedVideo = out;
+    return { file: out, name: path.basename(r.filePaths[0]) };
   });
 
   ipcMain.handle('mz:sensor:start', (_e, opts) => {

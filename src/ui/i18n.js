@@ -67,6 +67,7 @@ const en = {
   'video.title': "Use a recorded video instead of the camera",
   'video.note': "For demos and testing. Record yourself for about a minute (phone at 30 fps, face well lit), then choose the file. SmartSpectra reads it exactly like a live camera.",
   'video.choose': "Choose video…",
+  'video.preparing': "Preparing the video… (up to a minute)",
   'video.none': "No video chosen.",
   'video.file': "Video: {name}",
   'video.using': "Using a recorded video ({name}), not the live camera.",

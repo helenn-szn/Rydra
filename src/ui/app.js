@@ -508,7 +508,7 @@ VIEWS.check = () => {
     ${view.kind === 'departure' ? steps(1) : ''}
     <h1>${c.title}</h1>
     <p>${c.sub}</p>
-    ${sensor && sensor.videoFile ? `<p class="callout">${t('video.using', { name: esc(sensor.videoFile.split(/[\\/]/).pop()) })}</p>` : ''}
+    ${sensor && sensor.videoFile ? `<p class="callout">${t('video.using', { name: esc(state.settings.videoName || sensor.videoFile.split(/[\\/]/).pop()) })}</p>` : ''}
     <div class="camera">
       <video id="video" autoplay playsinline muted></video>
       <svg class="oval" viewBox="0 0 160 90" preserveAspectRatio="xMidYMid meet" aria-hidden="true"><defs><mask id="m"><rect width="160" height="90" fill="#fff"/><ellipse cx="80" cy="42" rx="22" ry="29" fill="#000"/></mask></defs><rect width="160" height="90" fill="rgba(20,22,25,.45)" mask="url(#m)"/><ellipse id="ovalLine" cx="80" cy="42" rx="22" ry="29" fill="none" stroke="#fff" stroke-width="1" stroke-dasharray="3 2"/></svg>
@@ -1062,7 +1062,7 @@ VIEWS.settings = () => {
       <select id="setCamera" class="select"><option>${t('loading')}</option></select>
       <p class="quiet">${t('settings.cameraNote')}</p>
       ${sensor && sensor.native ? `<label class="check"><input type="checkbox" id="useVideo" ${s.useVideo && s.videoFile ? 'checked' : ''} ${s.videoFile ? '' : 'disabled'}> <span><b>${t('video.title')}</b><br><small>${t('video.note')}</small></span></label>
-      <p class="quiet">${s.videoFile ? t('video.file', { name: esc(s.videoFile.split(/[\\/]/).pop()) }) : t('video.none')}</p>
+      <p class="quiet">${s.videoFile ? t('video.file', { name: esc(s.videoName || s.videoFile.split(/[\\/]/).pop()) }) : t('video.none')}</p>
       <button class="btn secondary" id="pickVideo">${t('video.choose')}</button>` : ''}</section>`}
     <section class="panel"><h3>${t('settings.units')}</h3>${seg('setUnits', [['km', t('units.km')], ['mi', t('units.mi')]], units())}</section>
     <section class="panel">
@@ -1101,11 +1101,16 @@ AFTER.settings = () => {
       await save();
     });
   }
-  on('#pickVideo', 'click', async () => {
-    const file = await window.mz.sensor.pickVideo();
-    if (!file) return;
-    state.settings.videoFile = file; state.settings.useVideo = true;
-    if (sensor) sensor.videoFile = file;
+  on('#pickVideo', 'click', async (e) => {
+    const btn = e.currentTarget;
+    btn.disabled = true; btn.textContent = t('video.preparing');
+    let picked = null;
+    try { picked = await window.mz.sensor.pickVideo(); }
+    catch (err) { alert(String(err && err.message || err).replace(/^Error invoking remote method '[^']+': (Error: )?/, '')); }
+    btn.disabled = false; btn.textContent = t('video.choose');
+    if (!picked) return;
+    state.settings.videoFile = picked.file; state.settings.videoName = picked.name; state.settings.useVideo = true;
+    if (sensor) sensor.videoFile = picked.file;
     await save(); render();
   });
   on('#useVideo', 'change', async (e) => {
