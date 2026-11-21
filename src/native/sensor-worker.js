@@ -94,7 +94,7 @@ function startFrameSource({ file, cameraName, onFrame, onEnd, onError }) {
   // Files are paced at 30 fps with exact timestamps; cameras keep their own timing (stamped on arrival).
   const vf = `scale=${W}:${H}:force_original_aspect_ratio=decrease,pad=${W}:${H}:(ow-iw)/2:(oh-ih)/2${file ? ',fps=30' : ''}`;
   const input = file
-    ? ['-re', '-i', file]
+    ? ['-i', file]   // not real-time: frames go in as fast as SmartSpectra takes them (timestamps keep the true timing)
     : ['-f', 'dshow', '-rtbufsize', '64M', '-framerate', '30', '-i', `video=${cameraName}`];
   const args = ['-hide_banner', '-loglevel', 'error', ...input, '-an', '-vf', vf, '-pix_fmt', 'rgb24', '-f', 'rawvideo', 'pipe:1'];
   log(`frames via ffmpeg from ${file ? 'the video file' : `camera "${cameraName}"`}`);
@@ -107,26 +107,32 @@ function startFrameSource({ file, cameraName, onFrame, onEnd, onError }) {
   let dropped = 0;
   // One frame per turn of the event loop, so SmartSpectra's callbacks, timers and the heartbeat
   // always get a turn. If more than a few frames wait, the oldest are dropped instead of piling up.
+  let paused = false;
   const pump = () => {
-    const frame = queue.shift();
-    if (!frame) { pumping = false; return; }
-    onFrame(frame, W, H);
+    const frame = queue[0];
+    if (!frame) { pumping = false; if (ended) onEnd(); return; }
+    const accepted = onFrame(frame, W, H);
+    if (file && accepted === false) { setTimeout(pump, 15); return; }   // SmartSpectra is busy: offer the same frame again shortly
+    queue.shift();
+    if (file && paused && queue.length < 4) { paused = false; p.stdout.resume(); }
     setImmediate(pump);
   };
+  let ended = false;
   p.stdout.on('data', (chunk) => {
     pending = pending.length ? Buffer.concat([pending, chunk]) : chunk;
     while (pending.length >= frameBytes) {
       queue.push(Buffer.from(pending.subarray(0, frameBytes)));
       pending = pending.subarray(frameBytes);
     }
-    while (queue.length > 3) { queue.shift(); dropped += 1; if (dropped % 30 === 1) log(`falling behind: ${dropped} frames skipped so far`); }
+    if (file) { if (queue.length > 12 && !paused) { paused = true; p.stdout.pause(); } }
+    else while (queue.length > 3) { queue.shift(); dropped += 1; if (dropped % 30 === 1) log(`falling behind: ${dropped} frames skipped so far`); }
     if (!pumping) { pumping = true; setImmediate(pump); }
   });
   p.stderr.on('data', (d) => { errText = (errText + d).slice(-1500); });
   p.on('error', (e) => onError(`Could not start ffmpeg: ${e.message}`));
   p.on('close', (code) => {
     if (errText.trim()) log(`ffmpeg: ${errText.trim().split(/\r?\n/).slice(-3).join(' | ')}`);
-    if (code === 0 || code === null) onEnd(); else onError(file ? 'The video could not be read.' : `The camera "${cameraName}" could not be opened. Is another app using it?`);
+    if (code === 0 || code === null) { ended = true; if (!pumping) onEnd(); } else onError(file ? 'The video could not be read.' : `The camera "${cameraName}" could not be opened. Is another app using it?`);
   });
   return { stop: () => { try { p.kill(); } catch { /* gone */ } } };
 }
@@ -160,7 +166,7 @@ async function start(opts) {
   check = { id, finished: false };
   const fpsTimer = setInterval(() => {
     // Some cameras don't report frames back; only show a rate when there is one.
-    if (framesThisSecond > 0) send({ type: 'camera', id, width: viaFfmpeg ? 640 : width, height: viaFfmpeg ? 480 : height, fps: framesThisSecond });
+    if (framesThisSecond > 0 && !file) send({ type: 'camera', id, width: viaFfmpeg ? 640 : width, height: viaFfmpeg ? 480 : height, fps: framesThisSecond });
     framesThisSecond = 0;
   }, 1000);
   const watchdog = setTimeout(() => { if (!runningAt) finish({ code: 'notStarted', message: 'The camera check did not start.', connection: true }); }, 45000);
@@ -192,7 +198,7 @@ async function start(opts) {
     if (status === ProcessingStatus.kRunning && !runningAt) {
       runningAt = Date.now();
       log(`check running (${seconds} s, metrics ${metrics.join(',')})`);
-      timer = setTimeout(() => finish(null), seconds * 1000);
+      if (!file) timer = setTimeout(() => finish(null), seconds * 1000);
     }
   });
   s.on('validationStatus', (code) => send({ type: 'hint', id, code }));
@@ -211,20 +217,35 @@ async function start(opts) {
       s.useCustomInput();
       s.start();
       let n = 0; let lastTs = -1; const t0 = process.hrtime.bigint();
+      let runTs = null; let lastProgress = 0;
+      let accepted = 0; let busy = 0; let sendMs = 0; let statAt = Date.now();
       source = startFrameSource({
         file,
         cameraName: opts.ffmpegCamera,
         onFrame: (buf, w, h) => {
           if (!check || check.id !== id) return;
+          if (!check || check.id !== id) return true;
           let ts = file ? n * 33333 : Number((process.hrtime.bigint() - t0) / 1000n);
           if (ts <= lastTs) ts = lastTs + 1;
-          lastTs = ts;
           const t1 = Date.now();
-          try { if (s.sendFrame(buf, w, h, w * 3, 0, ts) !== false) { frames += 1; framesThisSecond += 1; } } catch (err) { log(`sendFrame: ${err.message}`); }
-          const took = Date.now() - t1;
-          if (took > 500) log(`SmartSpectra took ${took} ms to accept one frame`);
-          n += 1;
+          let ok = false;
+          try { ok = s.sendFrame(buf, w, h, w * 3, 0, ts) !== false; } catch (err) { log(`sendFrame: ${err.message}`); ok = true; }
+          sendMs += Date.now() - t1;
+          if (Date.now() - statAt > 10000) {
+            log(`frames accepted ${accepted}, busy retries ${busy}, average ${(sendMs / Math.max(1, accepted + busy)).toFixed(0)} ms per sendFrame`);
+            statAt = Date.now();
+          }
+          if (!ok) { busy += 1; return false; }
+          accepted += 1; frames += 1; framesThisSecond += 1;
+          lastTs = ts; n += 1;
           if (n % 5 === 0) sendPreview(buf, w, h, w * 3, 0);
+          if (file && runningAt) {
+            if (runTs === null) runTs = ts;
+            const done = (ts - runTs) / 1e6;
+            if (Date.now() - lastProgress > 400) { lastProgress = Date.now(); send({ type: 'progress', id, secs: done }); }
+            if (done >= seconds) finish(null);
+          }
+          return true;
         },
         onEnd: () => { log('video finished'); if (runningAt) finish(null); else finish({ code: 'video', message: 'The video ended before the check could start.' }); },
         onError: (message) => finish({ code: 7, message }),

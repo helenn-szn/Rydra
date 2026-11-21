@@ -539,13 +539,14 @@ AFTER.check = () => {
   prog.style.strokeDashoffset = `${C}`;
   const qState = { light: 'pending', position: 'pending', stillness: 'pending' };
 
+  const showLeft = (left) => {
+    left = Math.max(0, left);
+    const el = $('count'); if (el) el.textContent = Math.ceil(left);
+    prog.style.strokeDashoffset = `${C * (left / view.seconds)}`;
+  };
   const startCountdown = () => {
     const t0 = Date.now();
-    timers.push(setInterval(() => {
-      const left = Math.max(0, view.seconds - (Date.now() - t0) / 1000);
-      const el = $('count'); if (el) el.textContent = Math.ceil(left);
-      prog.style.strokeDashoffset = `${C * (left / view.seconds)}`;
-    }, 250));
+    timers.push(setInterval(() => showLeft(view.seconds - (Date.now() - t0) / 1000), 250));
   };
 
   const onHint = (code) => {
@@ -585,6 +586,7 @@ AFTER.check = () => {
 
   sensor.measure({
     seconds: view.seconds, video: $('video'), abort, onRunning: startCountdown, onHint,
+    onProgress: (secs) => showLeft(view.seconds - secs),   // recorded videos: seconds of video measured so far
     onCamera: (c) => {
       fillPicker();
       const el = $('camInfo'); if (!el) return;

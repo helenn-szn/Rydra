@@ -96,7 +96,7 @@ class BackgroundSensor {
     }
   }
 
-  measureWith(metrics, { seconds, video, onLive, onHint, onRunning, onCamera, abort }) {
+  measureWith(metrics, { seconds, video, onLive, onHint, onRunning, onCamera, onProgress, abort }) {
     const id = `c${Date.now()}-${++seq}`;
     const size = SIZES[this.mode] || SIZES.standard;
     if (video) video.srcObject = previewStream();
@@ -110,7 +110,10 @@ class BackgroundSensor {
         if (m.type === 'status') {
           if (m.status === ProcessingStatus.kStarting && onHint) onHint('connecting');
           if (m.status === ProcessingStatus.kRunning && !running) {
-            running = true; console.log(`[rydra] check running (${seconds} s)`); if (onRunning) onRunning();
+            running = true; console.log(`[rydra] check running (${seconds} s)`);
+            // Recorded videos are read as fast as SmartSpectra can take them, so their countdown follows progress events.
+            if (onRunning && !(this.videoFile && onProgress)) onRunning();
+            if (this.videoFile) return;   // no wall-clock failsafe for videos; the engine's watchdog still applies
             // Failsafe: if no result arrives 15 s after the check should have ended, stop waiting.
             // Use the last live reading if there is a usable one; otherwise report the problem.
             overrun = setTimeout(() => {
@@ -124,6 +127,7 @@ class BackgroundSensor {
         } else if (m.type === 'hint') { if (onHint) onHint(HINTS[m.code] || 'ok'); }
         else if (m.type === 'camera') { if (onCamera) onCamera({ width: m.width, height: m.height, fps: m.fps }); }
         else if (m.type === 'live') { lastLive = m.reading; if (onLive) onLive(m.reading); }
+        else if (m.type === 'progress') { if (onProgress) onProgress(m.secs); }
         else if (m.type === 'result') {
           end(); console.log(`[rydra] result from the camera engine: ${m.frames} frames in ${m.secs.toFixed(1)} s`);
           resolve(this.videoFile ? Object.assign(m.reading, { fromVideo: true }) : m.reading);
