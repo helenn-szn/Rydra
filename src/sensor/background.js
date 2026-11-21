@@ -72,9 +72,9 @@ class BackgroundSensor {
     } catch (err) {
       if (opts.abort && opts.abort.aborted) throw err;
       // Code 7: SmartSpectra couldn't open the camera with the size we asked for. Retry once with the camera's own format.
-      if (err.code === SmartSpectraErrorCode.kInputUnavailable && this.mode !== 'native') {
-        console.warn('[rydra] Camera would not open at the requested size; retrying with its own default format.');
-        this.mode = 'native';
+      if (err.code === SmartSpectraErrorCode.kInputUnavailable && !this.videoFile && !this.useFfmpeg) {
+        console.warn('[rydra] SmartSpectra could not open the camera itself; retrying through ffmpeg.');
+        this.useFfmpeg = true;
         return this.measure(opts);
       }
       if (err.code === SmartSpectraErrorCode.kSustainedLowFrameRate && this.mode === 'standard') {
@@ -129,6 +129,7 @@ class BackgroundSensor {
         id, apiKey: this.apiKey, telemetry: this.telemetry, metrics, cameraId: this.cameraId,
         width: size.width, height: size.height, seconds, breathingOnly: metrics === BREATHING_ONLY,
         file: this.videoFile || undefined,
+        forceFfmpeg: !!this.useFfmpeg,
       }).catch((err) => { if (!done) { end(); reject(err); } });
     });
   }
