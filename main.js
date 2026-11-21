@@ -92,7 +92,16 @@ function createWindow() {
     },
   });
 
-  if (bindSmartSpectraIpc) bindSmartSpectraIpc(win);
+  if (bindSmartSpectraIpc) {
+    // Same folder the SDK's Electron glue uses, so its own later setup call matches ours.
+    try {
+      const { preconfigureWithDeviceId } = require('./src/native/device-id');
+      console.log('[rydra] ' + preconfigureWithDeviceId(
+        path.join(app.getPath('cache'), app.getName(), 'SmartSpectraSDK'),
+        path.join(app.getPath('userData'), 'smartspectra-device-id.txt')));
+    } catch (e) { console.log(`[rydra] could not set the SmartSpectra device ID: ${e && e.message}`); }
+    bindSmartSpectraIpc(win);
+  }
 
   // Terminal logging. Always: Rydra's own messages and errors (cheap). With the debug launcher
   // (SMARTSPECTRA_DIAGNOSTICS=1): everything except the per-frame chatter, which itself slows the app.

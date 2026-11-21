@@ -57,6 +57,17 @@ async function trySet(name, metrics, apiKey) {
   const apiKey = readKey();
   if (!apiKey) { console.log('No API key found. Put SMARTSPECTRA_API_KEY in the .env file in the Rydra folder.'); return; }
   console.log(`SmartSpectra ${SmartSpectraSDK.version || ''}, Node ${process.version}, ${process.platform} ${process.arch}`);
+  // Give the SDK a stable device ID before its first session (what Rydra now does).
+  // Run with NO_DEVICE_ID=1 to see the SDK's own behaviour instead.
+  const os = require('os');
+  const dir = path.join(process.env.LOCALAPPDATA || path.join(os.homedir(), '.cache'), 'SmartSpectraSDK');
+  if (process.env.NO_DEVICE_ID === '1') console.log('Device ID: left to the SDK (NO_DEVICE_ID=1)');
+  else {
+    try {
+      const { preconfigureWithDeviceId } = require('../../src/native/device-id');
+      console.log('Device ID: ' + preconfigureWithDeviceId(dir, path.join(dir, '..', 'Rydra-device-id.txt')));
+    } catch (e) { console.log(`Device ID: FAILED to set, error ${e.code}: ${e.message}`); }
+  }
   const summary = [];
   for (const [name, metrics] of SETS) summary.push(`${name.padEnd(26)} ${await trySet(name, metrics, apiKey)}`);
   console.log('\n===== SUMMARY =====');

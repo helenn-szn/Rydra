@@ -40,6 +40,14 @@ function createWindow() {
       contextIsolation: true, sandbox: true, nodeIntegration: false, backgroundThrottling: false,
     },
   });
+  if (process.env.REPRO_NO_DEVICE_ID !== '1') {
+    try {
+      const { preconfigureWithDeviceId } = require('../../src/native/device-id');
+      console.log(`[main ${stamp()}] ` + preconfigureWithDeviceId(
+        path.join(app.getPath('cache'), app.getName(), 'SmartSpectraSDK'),
+        path.join(app.getPath('userData'), 'smartspectra-device-id.txt')));
+    } catch (e) { console.log(`[main ${stamp()}] could not set the device ID: ${e && e.message}`); }
+  }
   bindSmartSpectraIpc(win);
   win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
   win.webContents.on('will-navigate', (e) => e.preventDefault());
