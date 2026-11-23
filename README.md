@@ -6,6 +6,8 @@ Drivers check their tyres, fuel and engine before a long trip. Rydra is a check 
 
 Built for the Presage SmartSpectra SDK Challenge on DEV.
 
+**Watch the demo video:** https://drive.google.com/file/d/1WCX_W34yYwRncXCqgQbQQdQRMvA07GyB/view?usp=drivesdk
+
 **Try the web demo:** https://rydra-pi.vercel.app (the full interface with simulated readings, on any device including phones; the real camera check runs in the desktop app below).
 
 > Rydra is a wellness and planning aid. It is **not a medical device** and never says a driver is "safe to drive" or "fatigued."
